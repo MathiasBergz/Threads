@@ -20,10 +20,13 @@ typedef struct {
 } City;
 
 void *readFile(void *path) {
-    ftpr = fopen("", "r");
+    ftpr = fopen("arquives/mqtt_senzemo_cx_bg.json", "r");
     if(ftpr == NULL) {
         printf("Arquivo nao encontrado.\n");
+        pthread_exit(NULL);
+        return 0;
     }
+    printf("Arquivo arberto\n");
     pthread_exit(NULL);
 }
 
