@@ -9,6 +9,7 @@
 #define MAX_RECORDS 100000
 #define LOG_QUEUE_SIZE 1000
 #define MAX_SF 16
+#define NUM_DEVICES 2
 
 typedef struct {
     char city[64];
@@ -88,11 +89,11 @@ void *logging_thread(void *arg) {
 
 // ---------------- File Reader ----------------
 void *file_reader_thread(void *arg) {
-    FileThreadData *data = (FileThreadData *)arg;
-    FILE *fp = fopen(data->filename, "r");
+    const char *filename = (const char *) arg;
+    FILE *fp = fopen(filename, "r");
     if (!fp) {
         char log[256];
-        snprintf(log, 256, "Error opening file: %s", data->filename);
+        snprintf(log, 256, "Error opening file: %s", filename);
         log_message(&logQueue, log);
         pthread_exit(NULL);
     }
@@ -110,33 +111,50 @@ void *file_reader_thread(void *arg) {
 
     if (!root || !cJSON_IsArray(root)) {
         char log[256];
-        snprintf(log, 256, "Invalid JSON in file: %s", data->filename);
+        snprintf(log, 256, "Invalid JSON in file: %s", filename);
         log_message(&logQueue, log);
         pthread_exit(NULL);
     }
 
     char log[256];
-    snprintf(log, 256, "File loaded: %s, records: %d", data->filename, cJSON_GetArraySize(root));
+    snprintf(log, 256, "File loaded: %s, records: %d", filename, cJSON_GetArraySize(root));
     log_message(&logQueue, log);
 
     pthread_mutex_lock(&globalRecords.mutex);
-    for (int i = 0; i < cJSON_GetArraySize(root); i++) {
+
+    typedef struct {
+        char *id;
+        char *name;
+        char *city;
+    } Device;
+
+    Device devices[NUM_DEVICES] = {
+        {"67bfa5e2020d2a000aec6673", "Caxias - Praça (S2)", "Caxias do Sul"},
+        {"67bfa56d36089a000a3254d5", "Bento - Praça (S3)", "Bento Gonçalves"}
+    };
+
+
+    for (int i = 0; i < cJSON_GetArraySize(root); i++) { // Array 
         cJSON *obj = cJSON_GetArrayItem(root, i);
         cJSON *payload = cJSON_GetObjectItem(obj, "brute_data");
         if (!payload) payload = cJSON_GetObjectItem(obj, "payload");
-        if (!payload) continue;
-        cJSON *dataArr = cJSON_GetObjectItem(payload, "data");
-        if (!cJSON_IsArray(dataArr)) continue;
+        if (!payload) continue;                                 // Verificar se não deveria dar erro 
+        cJSON *dataArr = cJSON_GetObjectItem(payload, "data"); // brute_data/data OR payload/data OR data
+        if (!cJSON_IsArray(dataArr)) continue;                 // Verificar isso aqui também
+
 
         Record rec = {0};
-        strcpy(rec.city, data->city);
+        cJSON *device_id = cJSON_GetObjectItem(payload, "device_id");
+        for (int k = 0; k < NUM_DEVICES; k++){
+            if(strcmp(devices[k].id,device_id->valuestring)) {strcpy(rec.city, devices[k].city);break;}
+        }
 
         for (int j = 0; j < cJSON_GetArraySize(dataArr); j++) {
             cJSON *item = cJSON_GetArrayItem(dataArr, j);
             cJSON *var = cJSON_GetObjectItem(item, "variable");
             cJSON *val = cJSON_GetObjectItem(item, "value");
             cJSON *time = cJSON_GetObjectItem(item, "time");
-            if (!var || !val || !time) continue;
+            if (!var || !val || !time) continue;              // Talvez loggar
 
             if (cJSON_IsNumber(val)) {
                 if (strcmp(var->valuestring, "temperature") == 0) { rec.temperature = val->valuedouble; strcpy(rec.timestamp, time->valuestring); }
@@ -254,6 +272,9 @@ void *statistics_thread(void *arg) {
 int main() {
     pthread_t threads[4];
 
+
+
+
     globalRecords.count = 0;
     pthread_mutex_init(&globalRecords.mutex, NULL);
 
@@ -267,10 +288,10 @@ int main() {
     pthread_create(&threads[0], NULL, logging_thread, &logQueue);
 
     // File reading threads
-    FileThreadData f1 = {"arquives/mqtt_senzemo_cx_bg.json", "Caxias do Sul"};
-    FileThreadData f2 = {"arquives/senzemo_cx_bg.json", "Bento Gonçalves"};
-    pthread_create(&threads[1], NULL, file_reader_thread, &f1);
-    pthread_create(&threads[2], NULL, file_reader_thread, &f2);
+    const char *f1 = "arquives/mqtt_senzemo_cx_bg.json";
+    const char *f2 = "arquives/senzemo_cx_bg.json";
+    pthread_create(&threads[1], NULL, file_reader_thread, (void *) f1);
+    pthread_create(&threads[2], NULL, file_reader_thread, (void *) f2);
 
     // Wait for file threads
     pthread_join(threads[1], NULL);
