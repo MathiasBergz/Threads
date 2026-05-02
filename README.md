@@ -1,11 +1,7 @@
-1. Instalar a biblioteca para ler o JSON com o comando 
+1. Garanta que você tem os arquivos yyjson.c e yyjson.h no mesmo diretório do TDESO.c
 
-sudo apt install libcjson-dev
-
-2. Compilar
-
-gcc TDESO.c -o TDESO -lpthread -lcjson
+2. Para compilar rode o seguinte comando:
+gcc main.c yyjson.c -o main -lpthread
 
 3. Executar
-
-./TDESO
+./main
