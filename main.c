@@ -340,8 +340,8 @@ int main() {
     pthread_create(&threads[0], NULL, logging_thread, &logQueue);
 
     // File reading threads
-    const char *f1 = "arquives/mqtt_senzemo_cx_bg.json";
-    const char *f2 = "arquives/senzemo_cx_bg.json";
+    const char *f1 = "files/mqtt_senzemo_cx_bg.json";
+    const char *f2 = "files/senzemo_cx_bg.json";
     pthread_create(&threads[1], NULL, file_reader_thread, (void *) f1);
     pthread_create(&threads[2], NULL, file_reader_thread, (void *) f2);
 
@@ -364,3 +364,4 @@ int main() {
 
     return 0;
 }
+        char humMinTime[64], humMaxTime[64];

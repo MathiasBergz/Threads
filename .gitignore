@@ -1,2 +1,6 @@
 devices.c
 processamento.log
+files/mqtt_senzemo_cx_bg.json
+.gitignore
+files/senzemo_cx_bg.json
+main
