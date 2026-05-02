@@ -4,7 +4,7 @@
 #include <string.h>
 #include <pthread.h>
 #include <time.h>
-#include <cjson/cJSON.h>
+#include "yyjson.h"
 
 #define MAX_RECORDS 100000
 #define LOG_QUEUE_SIZE 1000
@@ -106,10 +106,12 @@ void *file_reader_thread(void *arg) {
     buffer[size] = '\0';
     fclose(fp);
 
-    cJSON *root = cJSON_Parse(buffer);
+    yyjson_doc *doc = yyjson_read(buffer, strlen(buffer), 0);
     free(buffer);
 
-    if (!root || !cJSON_IsArray(root)) {
+    yyjson_val *root = yyjson_doc_get_root(doc);
+
+    if (!root || !yyjson_is_arr(root)) {
         char log[256];
         snprintf(log, 256, "Invalid JSON in file: %s", filename);
         log_message(&logQueue, log);
@@ -117,10 +119,8 @@ void *file_reader_thread(void *arg) {
     }
 
     char log[256];
-    snprintf(log, 256, "File loaded: %s, records: %d", filename, cJSON_GetArraySize(root));
+    snprintf(log, 256, "File loaded: %s, records: %zu", filename, yyjson_arr_size(root));
     log_message(&logQueue, log);
-
-    pthread_mutex_lock(&globalRecords.mutex);
 
     typedef struct {
         char *id;
@@ -133,42 +133,76 @@ void *file_reader_thread(void *arg) {
         {"67bfa56d36089a000a3254d5", "Bento - Praça (S3)", "Bento Gonçalves"}
     };
 
+    yyjson_arr_iter iter;
+    yyjson_arr_iter_init(root, &iter);
 
-    for (int i = 0; i < cJSON_GetArraySize(root); i++) { // Array 
-        cJSON *obj = cJSON_GetArrayItem(root, i);
-        cJSON *payload = cJSON_GetObjectItem(obj, "brute_data");
-        if (!payload) payload = cJSON_GetObjectItem(obj, "payload");
-        if (!payload) continue;                                 // Verificar se não deveria dar erro 
-        cJSON *dataArr = cJSON_GetObjectItem(payload, "data"); // brute_data/data OR payload/data OR data
-        if (!cJSON_IsArray(dataArr)) continue;                 // Verificar isso aqui também
+    yyjson_val *obj;
+    while ((obj = yyjson_arr_iter_next(&iter))) {
 
+        yyjson_val *payload = yyjson_obj_get(obj, "brute_data");
+        if (!payload) payload = yyjson_obj_get(obj, "payload");
+        if (!payload) {
+            snprintf(log, 256, "Não achou payload no arquivo %s\n", filename);
+            log_message(&logQueue, log);
+            continue;
+        }
+        yyjson_val *dataArr = yyjson_obj_get(payload, "data");
+        if (!yyjson_is_arr(dataArr)) {
+            snprintf(log, 256, "Não achou dataArr no arquivo %s\n", filename);
+            log_message(&logQueue, log);
+            continue;
+        }
 
         Record rec = {0};
-        cJSON *device_id = cJSON_GetObjectItem(payload, "device_id");
-        for (int k = 0; k < NUM_DEVICES; k++){
-            if(strcmp(devices[k].id,device_id->valuestring)) {strcpy(rec.city, devices[k].city);break;}
-        }
 
-        for (int j = 0; j < cJSON_GetArraySize(dataArr); j++) {
-            cJSON *item = cJSON_GetArrayItem(dataArr, j);
-            cJSON *var = cJSON_GetObjectItem(item, "variable");
-            cJSON *val = cJSON_GetObjectItem(item, "value");
-            cJSON *time = cJSON_GetObjectItem(item, "time");
-            if (!var || !val || !time) continue;              // Talvez loggar
+        yyjson_val *device_id = yyjson_obj_get(payload, "device_id");
+        const char *dev_id_str = yyjson_get_str(device_id);
 
-            if (cJSON_IsNumber(val)) {
-                if (strcmp(var->valuestring, "temperature") == 0) { rec.temperature = val->valuedouble; strcpy(rec.timestamp, time->valuestring); }
-                else if (strcmp(var->valuestring, "humidity") == 0) rec.humidity = val->valuedouble;
-                else if (strcmp(var->valuestring, "airpressure") == 0) rec.pressure = val->valuedouble;
-                else if (strcmp(var->valuestring, "batterylevel") == 0) rec.battery = val->valuedouble;
-                else if (strcmp(var->valuestring, "snr") == 0) rec.sf = (int)val->valuedouble;
+        for (int k = 0; k < NUM_DEVICES; k++) {
+            if (strcmp(devices[k].id, dev_id_str) == 0) {
+                strcpy(rec.city, devices[k].city);
+                break;
             }
         }
-        globalRecords.records[globalRecords.count++] = rec;
-    }
-    pthread_mutex_unlock(&globalRecords.mutex);
-    cJSON_Delete(root);
 
+        yyjson_arr_iter data_iter;
+        yyjson_arr_iter_init(dataArr, &data_iter);
+
+        yyjson_val *item;
+        while ((item = yyjson_arr_iter_next(&data_iter))) {
+
+            yyjson_val *var  = yyjson_obj_get(item, "variable");
+            yyjson_val *val  = yyjson_obj_get(item, "value");
+            yyjson_val *time = yyjson_obj_get(item, "time");
+
+            if (!var || !val || !time) {
+                snprintf(log, 256, "Faltou info: variable:%s | value:%s | time:%s no arquivo %s\n", yyjson_get_str(var),yyjson_get_str(val),yyjson_get_str(time),filename);
+                log_message(&logQueue, log);
+                continue;
+            }
+
+            const char *var_str  = yyjson_get_str(var);
+            const char *time_str = yyjson_get_str(time);
+
+            if (yyjson_is_num(val)) {
+                double v = yyjson_get_num(val);
+
+                if (strcmp(var_str, "temperature") == 0) {
+                    rec.temperature = v;
+                    strcpy(rec.timestamp, time_str);
+                }
+                else if (strcmp(var_str, "humidity") == 0) rec.humidity = v;
+                else if (strcmp(var_str, "airpressure") == 0) rec.pressure = v;
+                else if (strcmp(var_str, "batterylevel") == 0) rec.battery = v;
+                else if (strcmp(var_str, "snr") == 0) rec.sf = (int)v;
+            }
+        }
+        pthread_mutex_lock(&globalRecords.mutex);
+        globalRecords.records[globalRecords.count++] = rec;
+        pthread_mutex_unlock(&globalRecords.mutex);
+    }
+    
+    yyjson_doc_free(doc);
     pthread_exit(NULL);
 }
 
@@ -186,6 +220,7 @@ void *statistics_thread(void *arg) {
         float presMin, presMax, presSum;
         char presMinTime[64], presMaxTime[64];
         float batteryStart, batteryEnd;
+        char batStartTime[64], batEndTime[64];
         int sfUsed[MAX_SF], sfCount;
         int tempCount, humCount, presCount;
     } CityStats;
@@ -210,8 +245,10 @@ void *statistics_thread(void *arg) {
         CityStats *city = NULL;
         if (strcmp(r.city, "Caxias do Sul") == 0) city = &cities[0];
         else if (strcmp(r.city, "Bento Gonçalves") == 0) city = &cities[1];
-        if (!city) continue;
-
+        if (!city) {
+            log_message(&logQueue, "Há registros sem cidade.");
+            continue;
+        }
         if (r.temperature && r.temperature < city->tempMin) { city->tempMin = r.temperature; strcpy(city->tempMinTime, r.timestamp); }
         if (r.temperature && r.temperature > city->tempMax) { city->tempMax = r.temperature; strcpy(city->tempMaxTime, r.timestamp); }
         if (r.temperature) { city->tempSum += r.temperature; city->tempCount++; }
@@ -224,8 +261,23 @@ void *statistics_thread(void *arg) {
         if (r.pressure && r.pressure > city->presMax) { city->presMax = r.pressure; strcpy(city->presMaxTime, r.timestamp); }
         if (r.pressure) { city->presSum += r.pressure; city->presCount++; }
 
-        if (city->batteryStart < 0 && r.battery) city->batteryStart = r.battery;
-        if (r.battery) city->batteryEnd = r.battery;
+        if (r.battery){
+            if (city->batteryStart < 0) {
+                city->batteryStart = city->batteryEnd = r.battery; 
+                strcpy(city->batStartTime, r.timestamp); strcpy(city->batEndTime, r.timestamp);
+            }
+            else{
+                if(strcmp(city->batStartTime,r.timestamp) > 0){
+                    city->batteryStart = r.battery;
+                    strcpy(city->batStartTime, r.timestamp);
+                }
+                if(strcmp(r.timestamp,city->batEndTime) > 0){
+                    city->batteryEnd = r.battery;
+                    strcpy(city->batEndTime, r.timestamp);
+                }
+            }
+            
+        }
 
         int found = 0;
         for (int s = 0; s < city->sfCount; s++) if (city->sfUsed[s] == r.sf) found = 1;
