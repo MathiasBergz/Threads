@@ -139,8 +139,12 @@ void *file_reader_thread(void *arg) {
     yyjson_val *obj;
 
     double prev_air_press = -999;
+    double prev_hum = -999;
+    double prev_temp = -999;
     while ((obj = yyjson_arr_iter_next(&iter))) {
-        char flag_press_rep = 0;
+        bool flag_press_rep = false;
+        bool flag_hum_rep = false;
+        bool flag_temp_rep = false;
 
         yyjson_val *payload = yyjson_obj_get(obj, "brute_data");
         if (!payload) payload = yyjson_obj_get(obj, "payload");
@@ -191,13 +195,23 @@ void *file_reader_thread(void *arg) {
                 double v = yyjson_get_num(val);
                 
                 if (strcmp(var_str, "temperature") == 0) {
+                    if (v == prev_temp) {
+                        flag_temp_rep = true;
+                    }
                     rec.temperature = v;
+                    prev_temp = v;
                     strcpy(rec.timestamp, time_str);
                 }
-                else if (strcmp(var_str, "humidity") == 0) rec.humidity = v;
+                else if (strcmp(var_str, "humidity") == 0) {
+                    if (v == prev_hum) {
+                        flag_hum_rep = true;
+                    }
+                    rec.humidity = v;
+                    prev_hum = v;
+                }
                 else if (strcmp(var_str, "airpressure") == 0) {
                     if (v == prev_air_press) {
-                        flag_press_rep = 1;
+                        flag_press_rep = true;
                     }
                     rec.pressure = v;
                     prev_air_press = v;
@@ -206,15 +220,15 @@ void *file_reader_thread(void *arg) {
                 else if (strcmp(var_str, "snr") == 0) rec.sf = (int)v;
             }
         }
-        pthread_mutex_lock(&globalRecords.mutex);
-        if (!flag_press_rep) {
-            globalRecords.records[globalRecords.count++] = rec;
-        }
-        else{
+        if (flag_press_rep && flag_hum_rep && flag_temp_rep) {
             snprintf(log, 256, "Registro de dados repetidos ignorados: %s | %s no arquivo %s\n", rec.city, rec.timestamp, filename);
             log_message(&logQueue, log);
         }
-        pthread_mutex_unlock(&globalRecords.mutex);
+        else { 
+            pthread_mutex_lock(&globalRecords.mutex);
+            globalRecords.records[globalRecords.count++] = rec;
+            pthread_mutex_unlock(&globalRecords.mutex);
+        }
     }
     
     yyjson_doc_free(doc);
