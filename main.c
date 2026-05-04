@@ -1,4 +1,5 @@
 #define _POSIX_C_SOURCE 199309L
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -90,9 +91,13 @@ void *logging_thread(void *arg) {
 // ---------------- File Reader ----------------
 void *file_reader_thread(void *arg) {
     const char *filename = (const char *) arg;
+    char log[256];
+
+    snprintf(log, 256, "Thread iniciada: Abrindo arquivo %s para leitura", filename);
+    log_message(&logQueue, log);
+
     FILE *fp = fopen(filename, "r");
     if (!fp) {
-        char log[256];
         snprintf(log, 256, "Error opening file: %s", filename);
         log_message(&logQueue, log);
         pthread_exit(NULL);
@@ -112,13 +117,11 @@ void *file_reader_thread(void *arg) {
     yyjson_val *root = yyjson_doc_get_root(doc);
 
     if (!root || !yyjson_is_arr(root)) {
-        char log[256];
         snprintf(log, 256, "Invalid JSON in file: %s", filename);
         log_message(&logQueue, log);
         pthread_exit(NULL);
     }
 
-    char log[256];
     snprintf(log, 256, "File loaded: %s, records: %zu", filename, yyjson_arr_size(root));
     log_message(&logQueue, log);
 
@@ -239,6 +242,10 @@ void *file_reader_thread(void *arg) {
 void *statistics_thread(void *arg) {
     StatsThreadData *data = (StatsThreadData *)arg;
     RecordList *records = data->records;
+
+    char log[256];
+    snprintf(log, 256, "Iniciando calculo estatistico para %d registros validos.", records->count);
+    log_message(&logQueue, log);
 
     typedef struct {
         char city[64];
@@ -365,15 +372,22 @@ int main() {
     // Start logging thread
     pthread_create(&threads[0], NULL, logging_thread, &logQueue);
 
+    log_message(&logQueue, "Sistema inicializado. Estruturas e mutexes criados.");
+
     // File reading threads
     const char *f1 = "files/mqtt_senzemo_cx_bg.json";
     const char *f2 = "files/senzemo_cx_bg.json";
+
+    log_message(&logQueue, "Iniciando threads de leitura dos arquivos JSON...");
+
     pthread_create(&threads[1], NULL, file_reader_thread, (void *) f1);
     pthread_create(&threads[2], NULL, file_reader_thread, (void *) f2);
 
     // Wait for file threads
     pthread_join(threads[1], NULL);
     pthread_join(threads[2], NULL);
+
+    log_message(&logQueue, "Leitura de todos os arquivos concluida. Iniciando analise de dados...");
 
     // Start statistics thread
     StatsThreadData statsData = {&globalRecords, &logQueue};
