@@ -353,9 +353,6 @@ void *statistics_thread(void *arg) {
 int main() {
     pthread_t threads[4];
 
-
-
-
     globalRecords.count = 0;
     pthread_mutex_init(&globalRecords.mutex, NULL);
 
@@ -393,4 +390,3 @@ int main() {
 
     return 0;
 }
-        char humMinTime[64], humMaxTime[64];
