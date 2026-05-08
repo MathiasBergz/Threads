@@ -265,7 +265,7 @@ void *statistics_thread(void *arg) {
     strcpy(cities[0].city, "Caxias do Sul");
     strcpy(cities[1].city, "Bento Gonçalves");
 
-    for (int c = 0; c < 2; c++) {
+    for (int c = 0; c < NUM_DEVICES; c++) {
         cities[c].tempMin = cities[c].humMin = cities[c].presMin = 1e30;
         cities[c].tempMax = cities[c].humMax = cities[c].presMax = -1e30;
         cities[c].tempSum = cities[c].humSum = cities[c].presSum = 0;
@@ -327,7 +327,7 @@ void *statistics_thread(void *arg) {
     printf("Processamento utilizando pthreads\n");
     printf("============================================================\n\n");
 
-    for (int c = 0; c < 2; c++) {
+    for (int c = 0; c < NUM_DEVICES; c++) {
 
         // ordenação dos spreading factors
         int aux;
