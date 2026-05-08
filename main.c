@@ -141,9 +141,9 @@ void *file_reader_thread(void *arg) {
 
     yyjson_val *obj;
 
-    double prev_air_press = -999;
-    double prev_hum = -999;
-    double prev_temp = -999;
+    double prev_air_press[NUM_DEVICES] = {-999, -999}; // pos 0 == Caxias, pos 1 == Bento
+    double prev_hum[NUM_DEVICES] = {-999, -999}; // pos 0 == Caxias, pos 1 == Bento
+    double prev_temp[NUM_DEVICES] = {-999, -999}; // pos 0 == Caxias, pos 1 == Bento
     while ((obj = yyjson_arr_iter_next(&iter))) {
         bool flag_press_rep = false;
         bool flag_hum_rep = false;
@@ -168,9 +168,12 @@ void *file_reader_thread(void *arg) {
         yyjson_val *device_id = yyjson_obj_get(payload, "device_id");
         const char *dev_id_str = yyjson_get_str(device_id);
 
+        int dev_index = -1;
+
         for (int k = 0; k < NUM_DEVICES; k++) {
             if (strcmp(devices[k].id, dev_id_str) == 0) {
-                strcpy(rec.city, devices[k].city);
+                strcpy(rec.city, devices[k].city); // k==0: Caxias, k==1: Bento
+                dev_index = k;
                 break;
             }
         }
@@ -198,26 +201,28 @@ void *file_reader_thread(void *arg) {
                 double v = yyjson_get_num(val);
                 
                 if (strcmp(var_str, "temperature") == 0) {
-                    if (v == prev_temp) {
+
+                    if (v == prev_temp[dev_index]) {
                         flag_temp_rep = true;
                     }
+
                     rec.temperature = v;
-                    prev_temp = v;
+                    prev_temp[dev_index] = v;
                     strcpy(rec.timestamp, time_str);
                 }
                 else if (strcmp(var_str, "humidity") == 0) {
-                    if (v == prev_hum) {
+                    if (v == prev_hum[dev_index]) {
                         flag_hum_rep = true;
                     }
                     rec.humidity = v;
-                    prev_hum = v;
+                    prev_hum[dev_index] = v;
                 }
                 else if (strcmp(var_str, "airpressure") == 0) {
-                    if (v == prev_air_press) {
+                    if (v == prev_air_press[dev_index]) {
                         flag_press_rep = true;
                     }
                     rec.pressure = v;
-                    prev_air_press = v;
+                    prev_air_press[dev_index] = v;
                 }
                 else if (strcmp(var_str, "batterylevel") == 0) rec.battery = v;
                 else if (strcmp(var_str, "lora_spreading_factor") == 0) rec.sf = (int)v;
