@@ -9,7 +9,7 @@
 
 #define MAX_RECORDS 100000
 #define LOG_QUEUE_SIZE 1000
-#define MAX_SF 16
+#define MAX_SF 6
 #define NUM_DEVICES 2
 
 typedef struct {
@@ -220,7 +220,7 @@ void *file_reader_thread(void *arg) {
                     prev_air_press = v;
                 }
                 else if (strcmp(var_str, "batterylevel") == 0) rec.battery = v;
-                else if (strcmp(var_str, "snr") == 0) rec.sf = (int)v;
+                else if (strcmp(var_str, "lora_spreading_factor") == 0) rec.sf = (int)v;
             }
         }
         if (flag_press_rep && flag_hum_rep && flag_temp_rep) {
@@ -328,6 +328,19 @@ void *statistics_thread(void *arg) {
     printf("============================================================\n\n");
 
     for (int c = 0; c < 2; c++) {
+
+        // ordenação dos spreading factors
+        int aux;
+        for (int i = 0; i < cities[c].sfCount-1; i++) {
+            for (int j = 0; j < cities[c].sfCount-1-i; j++) {
+                if (cities[c].sfUsed[j] > cities[c].sfUsed[j+1]) {
+                    aux = cities[c].sfUsed[j];
+                    cities[c].sfUsed[j] = cities[c].sfUsed[j+1];
+                    cities[c].sfUsed[j+1] = aux;
+                }
+            }
+        }
+        
         printf("Cidade: %s\n", cities[c].city);
         printf("TEMPERATURA: Min %.2f em %s | Max %.2f em %s | Média %.2f\n",
             cities[c].tempMin, cities[c].tempMinTime,
@@ -345,9 +358,12 @@ void *statistics_thread(void *arg) {
             cities[c].batteryStart, cities[c].batteryEnd,
             cities[c].batteryStart - cities[c].batteryEnd);
         printf("SPREADING FACTORS: ");
-        for (int s = 0; s < cities[c].sfCount; s++) {
-            if (s > 0) printf(", ");
-            printf("SF%d", cities[c].sfUsed[s]);
+        if (cities[c].sfCount == 0) printf("Nenhum registro de Spreading Factor encontrado");
+        else{
+            for (int s = 0; s < cities[c].sfCount; s++) {
+                if (s > 0) printf(", ");
+                printf("SF%d", cities[c].sfUsed[s]);
+            }
         }
         printf("\n\n");
     }
