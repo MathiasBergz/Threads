@@ -14,6 +14,7 @@
 
 typedef struct {
     char city[64];
+    char block_timestamp[64];
     char temp_timestamp[64];
     char hum_timestamp[64];
     char pres_timestamp[64];
@@ -175,6 +176,7 @@ void *file_reader_thread(void *arg) {
         }
 
         Record rec = {0};
+        strcpy(rec.block_timestamp, data_block_date);
 
         yyjson_val *device_id = yyjson_obj_get(payload, "device_id");
         const char *dev_id_str = yyjson_get_str(device_id);
@@ -263,11 +265,23 @@ void *file_reader_thread(void *arg) {
 void formatar_data(const char *data_original, char *data_formatada) {
     int ano, mes, dia, hora, min, seg;
     
-    if (sscanf(data_original, "%d-%d-%dT%d:%d:%dZ", &ano, &mes, &dia, &hora, &min, &seg) == 6) {
+    if (sscanf(data_original, "%d-%d-%dT%d:%d:%d", &ano, &mes, &dia, &hora, &min, &seg) == 6) {
 
         snprintf(data_formatada, 64, "%02d/%02d/%04d %02d:%02d:%02d", dia, mes, ano, hora, min, seg);
     } else {
         strcpy(data_formatada, data_original);
+    }
+}
+
+// ---------------- Formatação de data curta (Apenas DD/MM/AAAA) ----------------
+void formatar_data_curta(const char *data_original, char *data_formatada) {
+    int ano, mes, dia;
+    
+    // Lê apenas até o dia e ignora o resto (a partir do 'T')
+    if (sscanf(data_original, "%d-%d-%d", &ano, &mes, &dia) == 3) {
+        snprintf(data_formatada, 64, "%02d/%02d/%04d", dia, mes, ano);
+    } else {
+        strcpy(data_formatada, data_original); // Fallback caso dê erro
     }
 }
 
@@ -282,6 +296,7 @@ void *statistics_thread(void *arg) {
 
     typedef struct {
         char city[64];
+        char periodStart[64], periodEnd[64];
         float tempMin, tempMax, tempSum;
         char tempMinTime[64], tempMaxTime[64];
         float humMin, humMax, humSum;
@@ -299,6 +314,7 @@ void *statistics_thread(void *arg) {
     strcpy(cities[1].city, "Bento Gonçalves");
 
     for (int c = 0; c < NUM_DEVICES; c++) {
+        cities[c].periodStart[0] = cities[c].periodEnd[0] = '\0';
         cities[c].tempMin = cities[c].humMin = cities[c].presMin = 1e30;
         cities[c].tempMax = cities[c].humMax = cities[c].presMax = -1e30;
         cities[c].tempSum = cities[c].humSum = cities[c].presSum = 0;
@@ -321,6 +337,13 @@ void *statistics_thread(void *arg) {
         }
 
         city->totalRegCount++;
+
+        if (city->periodStart[0] == '\0' || strcmp(r.block_timestamp, city->periodStart) < 0) {
+            strcpy(city->periodStart, r.block_timestamp);
+        }
+        if (city->periodEnd[0] == '\0' || strcmp(r.block_timestamp, city->periodEnd) > 0) {
+            strcpy(city->periodEnd, r.block_timestamp);
+        }
 
         if (r.temperature && r.temperature < city->tempMin) { city->tempMin = r.temperature; strcpy(city->tempMinTime, r.temp_timestamp); }
         if (r.temperature && r.temperature > city->tempMax) { city->tempMax = r.temperature; strcpy(city->tempMaxTime, r.temp_timestamp); }
@@ -381,6 +404,7 @@ void *statistics_thread(void *arg) {
         char dataFormatada_TempMin[64], dataFormatada_TempMax[64];
         char dataFormatada_HumMin[64], dataFormatada_HumMax[64];
         char dataFormatada_PresMin[64], dataFormatada_PresMax[64];
+        char StartPeriod_Formatado[64], EndPeriod_Formatado[64];
 
         formatar_data(cities[c].tempMinTime, dataFormatada_TempMin);
         formatar_data(cities[c].tempMaxTime, dataFormatada_TempMax);
@@ -388,8 +412,14 @@ void *statistics_thread(void *arg) {
         formatar_data(cities[c].humMaxTime, dataFormatada_HumMax);
         formatar_data(cities[c].presMinTime, dataFormatada_PresMin);
         formatar_data(cities[c].presMaxTime, dataFormatada_PresMax);
+        formatar_data_curta(cities[c].periodStart, StartPeriod_Formatado);
+        formatar_data_curta(cities[c].periodEnd, EndPeriod_Formatado);
 
         printf("Cidade: %s\n", cities[c].city);
+        printf("Cidade Analisada: %s\n", c == 0 ? "Caxias do Sul" : "Bento Gonçalves");
+        printf("Total de registros processados: %d\n", cities[c].totalRegCount);
+        printf("Período analisado: %s a %s\n\n", StartPeriod_Formatado, EndPeriod_Formatado);
+
         printf("TEMPERATURA: Min %.2f em %s | Max %.2f em %s | Média %.2f\n",
             cities[c].tempMin, dataFormatada_TempMin,
             cities[c].tempMax, dataFormatada_TempMax,
