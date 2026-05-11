@@ -291,7 +291,7 @@ void *statistics_thread(void *arg) {
         float batteryStart, batteryEnd;
         char batStartTime[64], batEndTime[64];
         int sfUsed[MAX_SF], sfCount;
-        int tempCount, humCount, presCount;
+        int totalRegCount, tempCount, humCount, presCount;
     } CityStats;
 
     CityStats cities[2];
@@ -303,6 +303,7 @@ void *statistics_thread(void *arg) {
         cities[c].tempMax = cities[c].humMax = cities[c].presMax = -1e30;
         cities[c].tempSum = cities[c].humSum = cities[c].presSum = 0;
         cities[c].tempCount = cities[c].humCount = cities[c].presCount = 0;
+        cities[c].totalRegCount = 0;
         cities[c].batteryStart = -1;
         cities[c].batteryEnd = -1;
         cities[c].sfCount = 0;
@@ -318,6 +319,9 @@ void *statistics_thread(void *arg) {
             log_message(&logQueue, "Há registros sem cidade.");
             continue;
         }
+
+        city->totalRegCount++;
+
         if (r.temperature && r.temperature < city->tempMin) { city->tempMin = r.temperature; strcpy(city->tempMinTime, r.temp_timestamp); }
         if (r.temperature && r.temperature > city->tempMax) { city->tempMax = r.temperature; strcpy(city->tempMaxTime, r.temp_timestamp); }
         if (r.temperature) { city->tempSum += r.temperature; city->tempCount++; }
