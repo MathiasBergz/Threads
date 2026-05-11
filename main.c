@@ -259,6 +259,18 @@ void *file_reader_thread(void *arg) {
     pthread_exit(NULL);
 }
 
+// ---------------- Formatação de data e hora ----------------
+void formatar_data(const char *data_original, char *data_formatada) {
+    int ano, mes, dia, hora, min, seg;
+    
+    if (sscanf(data_original, "%d-%d-%dT%d:%d:%dZ", &ano, &mes, &dia, &hora, &min, &seg) == 6) {
+
+        snprintf(data_formatada, 64, "%02d/%02d/%04d %02d:%02d:%02d", dia, mes, ano, hora, min, seg);
+    } else {
+        strcpy(data_formatada, data_original);
+    }
+}
+
 // ---------------- Statistics ----------------
 void *statistics_thread(void *arg) {
     StatsThreadData *data = (StatsThreadData *)arg;
@@ -361,19 +373,30 @@ void *statistics_thread(void *arg) {
                 }
             }
         }
-        
+
+        char dataFormatada_TempMin[64], dataFormatada_TempMax[64];
+        char dataFormatada_HumMin[64], dataFormatada_HumMax[64];
+        char dataFormatada_PresMin[64], dataFormatada_PresMax[64];
+
+        formatar_data(cities[c].tempMinTime, dataFormatada_TempMin);
+        formatar_data(cities[c].tempMaxTime, dataFormatada_TempMax);
+        formatar_data(cities[c].humMinTime, dataFormatada_HumMin);
+        formatar_data(cities[c].humMaxTime, dataFormatada_HumMax);
+        formatar_data(cities[c].presMinTime, dataFormatada_PresMin);
+        formatar_data(cities[c].presMaxTime, dataFormatada_PresMax);
+
         printf("Cidade: %s\n", cities[c].city);
         printf("TEMPERATURA: Min %.2f em %s | Max %.2f em %s | Média %.2f\n",
-            cities[c].tempMin, cities[c].tempMinTime,
-            cities[c].tempMax, cities[c].tempMaxTime,
+            cities[c].tempMin, dataFormatada_TempMin,
+            cities[c].tempMax, dataFormatada_TempMax,
             cities[c].tempCount ? cities[c].tempSum / cities[c].tempCount : 0);
         printf("UMIDADE: Min %.2f em %s | Max %.2f em %s | Média %.2f\n",
-            cities[c].humMin, cities[c].humMinTime,
-            cities[c].humMax, cities[c].humMaxTime,
+            cities[c].humMin, dataFormatada_HumMin,
+            cities[c].humMax, dataFormatada_HumMax,
             cities[c].humCount ? cities[c].humSum / cities[c].humCount : 0);
         printf("PRESSÃO: Min %.2f em %s | Max %.2f em %s | Média %.2f\n",
-            cities[c].presMin, cities[c].presMinTime,
-            cities[c].presMax, cities[c].presMaxTime,
+            cities[c].presMin, dataFormatada_PresMin,
+            cities[c].presMax, dataFormatada_PresMax,
             cities[c].presCount ? cities[c].presSum / cities[c].presCount : 0);
         printf("BATERIA: Inicial %.2f | Final %.2f | Consumo %.2f\n",
             cities[c].batteryStart, cities[c].batteryEnd,
