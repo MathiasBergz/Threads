@@ -14,7 +14,10 @@
 
 typedef struct {
     char city[64];
-    char timestamp[64];
+    char temp_timestamp[64];
+    char hum_timestamp[64];
+    char pres_timestamp[64];
+    char bat_timestamp[64];
     float temperature;
     float humidity;
     float pressure;
@@ -149,6 +152,14 @@ void *file_reader_thread(void *arg) {
         bool flag_hum_rep = false;
         bool flag_temp_rep = false;
 
+        yyjson_val *data_block_date_val = yyjson_obj_get(obj, "created_at");
+        
+        if (!data_block_date_val) {
+            data_block_date_val = yyjson_obj_get(obj, "payload_date");
+        }
+        
+        const char *data_block_date = data_block_date_val ? yyjson_get_str(data_block_date_val) : "Data_Desconhecida";
+        
         yyjson_val *payload = yyjson_obj_get(obj, "brute_data");
         if (!payload) payload = yyjson_obj_get(obj, "payload");
         if (!payload) {
@@ -208,7 +219,7 @@ void *file_reader_thread(void *arg) {
 
                     rec.temperature = v;
                     prev_temp[dev_index] = v;
-                    strcpy(rec.timestamp, time_str);
+                    strcpy(rec.temp_timestamp, time_str);
                 }
                 else if (strcmp(var_str, "humidity") == 0) {
                     if (v == prev_hum[dev_index]) {
@@ -216,6 +227,7 @@ void *file_reader_thread(void *arg) {
                     }
                     rec.humidity = v;
                     prev_hum[dev_index] = v;
+                    strcpy(rec.hum_timestamp, time_str);
                 }
                 else if (strcmp(var_str, "airpressure") == 0) {
                     if (v == prev_air_press[dev_index]) {
@@ -223,13 +235,17 @@ void *file_reader_thread(void *arg) {
                     }
                     rec.pressure = v;
                     prev_air_press[dev_index] = v;
+                    strcpy(rec.pres_timestamp, time_str);
                 }
-                else if (strcmp(var_str, "batterylevel") == 0) rec.battery = v;
+                else if (strcmp(var_str, "batterylevel") == 0) {
+                    rec.battery = v;
+                    strcpy(rec.bat_timestamp, time_str);
+                } 
                 else if (strcmp(var_str, "lora_spreading_factor") == 0) rec.sf = (int)v;
             }
         }
         if (flag_press_rep && flag_hum_rep && flag_temp_rep) {
-            snprintf(log, 256, "Registro de dados repetidos ignorados: %s | %s no arquivo %s\n", rec.city, rec.timestamp, filename);
+            snprintf(log, 256, "Registro de dados repetidos ignorados: %s | %s no arquivo %s\n", rec.city, data_block_date, filename);
             log_message(&logQueue, log);
         }
         else { 
@@ -290,31 +306,31 @@ void *statistics_thread(void *arg) {
             log_message(&logQueue, "Há registros sem cidade.");
             continue;
         }
-        if (r.temperature && r.temperature < city->tempMin) { city->tempMin = r.temperature; strcpy(city->tempMinTime, r.timestamp); }
-        if (r.temperature && r.temperature > city->tempMax) { city->tempMax = r.temperature; strcpy(city->tempMaxTime, r.timestamp); }
+        if (r.temperature && r.temperature < city->tempMin) { city->tempMin = r.temperature; strcpy(city->tempMinTime, r.temp_timestamp); }
+        if (r.temperature && r.temperature > city->tempMax) { city->tempMax = r.temperature; strcpy(city->tempMaxTime, r.temp_timestamp); }
         if (r.temperature) { city->tempSum += r.temperature; city->tempCount++; }
 
-        if (r.humidity && r.humidity < city->humMin) { city->humMin = r.humidity; strcpy(city->humMinTime, r.timestamp); }
-        if (r.humidity && r.humidity > city->humMax) { city->humMax = r.humidity; strcpy(city->humMaxTime, r.timestamp); }
+        if (r.humidity && r.humidity < city->humMin) { city->humMin = r.humidity; strcpy(city->humMinTime, r.hum_timestamp); }
+        if (r.humidity && r.humidity > city->humMax) { city->humMax = r.humidity; strcpy(city->humMaxTime, r.hum_timestamp); }
         if (r.humidity) { city->humSum += r.humidity; city->humCount++; }
 
-        if (r.pressure && r.pressure < city->presMin) { city->presMin = r.pressure; strcpy(city->presMinTime, r.timestamp); }
-        if (r.pressure && r.pressure > city->presMax) { city->presMax = r.pressure; strcpy(city->presMaxTime, r.timestamp); }
+        if (r.pressure && r.pressure < city->presMin) { city->presMin = r.pressure; strcpy(city->presMinTime, r.pres_timestamp); }
+        if (r.pressure && r.pressure > city->presMax) { city->presMax = r.pressure; strcpy(city->presMaxTime, r.pres_timestamp); }
         if (r.pressure) { city->presSum += r.pressure; city->presCount++; }
 
         if (r.battery){
             if (city->batteryStart < 0) {
                 city->batteryStart = city->batteryEnd = r.battery; 
-                strcpy(city->batStartTime, r.timestamp); strcpy(city->batEndTime, r.timestamp);
+                strcpy(city->batStartTime, r.bat_timestamp); strcpy(city->batEndTime, r.bat_timestamp);
             }
             else{
-                if(strcmp(city->batStartTime,r.timestamp) > 0){
+                if(strcmp(city->batStartTime,r.bat_timestamp) > 0){
                     city->batteryStart = r.battery;
-                    strcpy(city->batStartTime, r.timestamp);
+                    strcpy(city->batStartTime, r.bat_timestamp);
                 }
-                if(strcmp(r.timestamp,city->batEndTime) > 0){
+                if(strcmp(r.bat_timestamp,city->batEndTime) > 0){
                     city->batteryEnd = r.battery;
-                    strcpy(city->batEndTime, r.timestamp);
+                    strcpy(city->batEndTime, r.bat_timestamp);
                 }
             }
             
