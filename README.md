@@ -3,5 +3,8 @@
 2. Para compilar rode o seguinte comando:
 gcc main.c yyjson.c -o main -lpthread
 
-3. Executar.
+3. Para executar:
 ./main
+
+4. Caso queira executar e gerar um arquivo .txt com o relatório:
+./main | tee relatorio.txt
