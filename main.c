@@ -185,6 +185,12 @@ void *file_reader_thread(void *arg) {
             data_block_date_val = yyjson_obj_get(obj, "payload_date");
         }
         const char *data_block_date = data_block_date_val ? yyjson_get_str(data_block_date_val) : "Data_Desconhecida";
+
+        yyjson_val *id_val = yyjson_obj_get(obj, "id");
+        if (!id_val) {
+            id_val = yyjson_obj_get(obj, "payload_id");
+        }
+        long long block_id = id_val ? yyjson_get_int(id_val) : -1;
         
         yyjson_val *payload = yyjson_obj_get(obj, "brute_data");
         if (!payload) payload = yyjson_obj_get(obj, "payload");
@@ -216,16 +222,16 @@ void *file_reader_thread(void *arg) {
         double diferenca_segundos = calcular_diferenca_segundos(prev_block_time[dev_index], data_block_date);
         double distancia_absoluta = fabs(diferenca_segundos);
 
-        if (distancia_absoluta < 840.0) {
-            snprintf(log, 256, "[DUPLICATA BLOQUEADA] %s | Temp. do último: %.0fs | Arquivo: %s", 
-                     devices[dev_index].city, diferenca_segundos, filename);
+        if (distancia_absoluta < 800.0) {
+            snprintf(log, 256, "[DUPLICATA BLOQUEADA] %s | ID: %lld | Tempo do último: %.0fs | Arquivo: %s", 
+                     devices[dev_index].city, block_id, diferenca_segundos, filename);
             log_message(&logQueue, log);
             continue;
         }
 
         if (prev_block_time[dev_index][0] != '\0') {
-            snprintf(log, 256, "[DADO ACEITO] %s | Tempo desde último: %.0fs", 
-                     devices[dev_index].city, diferenca_segundos);
+            snprintf(log, 256, "[DADO ACEITO] %s | ID: %lld | Tempo desde último: %.0fs | Arquivo: %s", 
+                     devices[dev_index].city, block_id, diferenca_segundos, filename);
             log_message(&logQueue, log);
         }
         
