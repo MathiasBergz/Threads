@@ -387,6 +387,32 @@ void *statistics_thread(void *arg) {
     printf("Processamento utilizando pthreads\n");
     printf("============================================================\n\n");
 
+    char StartPeriod_Formatado[64], EndPeriod_Formatado[64];
+    for (int c = 0; c < NUM_DEVICES; c++) {
+        char f_start[64], f_end[64];
+        formatar_data_curta(cities[c].periodStart, StartPeriod_Formatado);
+        formatar_data_curta(cities[c].periodEnd, EndPeriod_Formatado);
+        
+        printf("Cidade Analisada: %s\n", c == 0 ? "Caxias do Sul" : "Bento Gonçalves");
+        printf("Total de registros processados: %d\n", cities[c].totalRegCount);
+        printf("Período analisado: %s a %s\n\n", StartPeriod_Formatado, EndPeriod_Formatado);
+    }
+    printf("------------------------------------------------------------\n");
+    printf("TEMPERATURA (°C)\n");
+    printf("------------------------------------------------------------\n"); 
+    printf("%-17s | %-6s | %-21s | %-6s | %-21s | %s\n", "Cidade", "Mínima", "Data/Hora", "Máxima", "Data/Hora", "Média");
+    printf("-----------------------------------------------------------------------------------------------\n");
+
+    for (int c = 0; c < NUM_DEVICES; c++){
+        char dataFormatada_TempMin[64], dataFormatada_TempMax[64];
+        formatar_data(cities[c].tempMinTime, dataFormatada_TempMin);
+        formatar_data(cities[c].tempMaxTime, dataFormatada_TempMax);
+        
+        printf("%-17s | %-6.2f | %-21s | %-6.2f | %-21s | %.2f\n",
+                cities[c].city, cities[c].tempMin, dataFormatada_TempMin, cities[c].tempMax, dataFormatada_TempMax,
+                cities[c].tempCount ? cities[c].tempSum / cities[c].tempCount : 0);
+    }
+
     for (int c = 0; c < NUM_DEVICES; c++) {
 
         // ordenação dos spreading factors
@@ -401,29 +427,18 @@ void *statistics_thread(void *arg) {
             }
         }
 
-        char dataFormatada_TempMin[64], dataFormatada_TempMax[64];
         char dataFormatada_HumMin[64], dataFormatada_HumMax[64];
         char dataFormatada_PresMin[64], dataFormatada_PresMax[64];
-        char StartPeriod_Formatado[64], EndPeriod_Formatado[64];
 
-        formatar_data(cities[c].tempMinTime, dataFormatada_TempMin);
-        formatar_data(cities[c].tempMaxTime, dataFormatada_TempMax);
         formatar_data(cities[c].humMinTime, dataFormatada_HumMin);
         formatar_data(cities[c].humMaxTime, dataFormatada_HumMax);
         formatar_data(cities[c].presMinTime, dataFormatada_PresMin);
         formatar_data(cities[c].presMaxTime, dataFormatada_PresMax);
-        formatar_data_curta(cities[c].periodStart, StartPeriod_Formatado);
-        formatar_data_curta(cities[c].periodEnd, EndPeriod_Formatado);
 
-        printf("Cidade: %s\n", cities[c].city);
-        printf("Cidade Analisada: %s\n", c == 0 ? "Caxias do Sul" : "Bento Gonçalves");
-        printf("Total de registros processados: %d\n", cities[c].totalRegCount);
-        printf("Período analisado: %s a %s\n\n", StartPeriod_Formatado, EndPeriod_Formatado);
-
-        printf("TEMPERATURA: Min %.2f em %s | Max %.2f em %s | Média %.2f\n",
-            cities[c].tempMin, dataFormatada_TempMin,
-            cities[c].tempMax, dataFormatada_TempMax,
-            cities[c].tempCount ? cities[c].tempSum / cities[c].tempCount : 0);
+        // printf("TEMPERATURA: Min %.2f em %s | Max %.2f em %s | Média %.2f\n",
+        //     cities[c].tempMin, dataFormatada_TempMin,
+        //     cities[c].tempMax, dataFormatada_TempMax,
+        //     cities[c].tempCount ? cities[c].tempSum / cities[c].tempCount : 0);
         printf("UMIDADE: Min %.2f em %s | Max %.2f em %s | Média %.2f\n",
             cities[c].humMin, dataFormatada_HumMin,
             cities[c].humMax, dataFormatada_HumMax,
