@@ -393,10 +393,11 @@ void *statistics_thread(void *arg) {
         formatar_data_curta(cities[c].periodStart, StartPeriod_Formatado);
         formatar_data_curta(cities[c].periodEnd, EndPeriod_Formatado);
         
-        printf("Cidade Analisada: %s\n", c == 0 ? "Caxias do Sul" : "Bento Gonçalves");
+        printf("Cidade Analisada: %s\n", cities[c].city);
         printf("Total de registros processados: %d\n", cities[c].totalRegCount);
         printf("Período analisado: %s a %s\n\n", StartPeriod_Formatado, EndPeriod_Formatado);
     }
+
     printf("------------------------------------------------------------\n");
     printf("TEMPERATURA (°C)\n");
     printf("------------------------------------------------------------\n"); 
@@ -408,14 +409,67 @@ void *statistics_thread(void *arg) {
         formatar_data(cities[c].tempMinTime, dataFormatada_TempMin);
         formatar_data(cities[c].tempMaxTime, dataFormatada_TempMax);
         
-        printf("%-17s | %-6.2f | %-21s | %-6.2f | %-21s | %.2f\n",
-                cities[c].city, cities[c].tempMin, dataFormatada_TempMin, cities[c].tempMax, dataFormatada_TempMax,
+        printf("%s | %-6.2f | %-21s | %-6.2f | %-21s | %.2f\n",
+                c==0 ? "Caxias do Sul    " : "Bento Gonçalves  ", cities[c].tempMin, dataFormatada_TempMin, cities[c].tempMax, dataFormatada_TempMax,
                 cities[c].tempCount ? cities[c].tempSum / cities[c].tempCount : 0);
     }
+    printf("\n\n");
 
+    printf("------------------------------------------------------------\n");
+    printf("UMIDADE (%%)\n");
+    printf("------------------------------------------------------------\n"); 
+    printf("%-17s | %-6s | %-21s | %-6s | %-21s | %s\n", "Cidade", "Mínima", "Data/Hora", "Máxima", "Data/Hora", "Média");
+    printf("-----------------------------------------------------------------------------------------------\n");
+
+    for (int c = 0; c < NUM_DEVICES; c++){
+        char dataFormatada_HumMin[64], dataFormatada_HumMax[64];
+        formatar_data(cities[c].humMinTime, dataFormatada_HumMin);
+        formatar_data(cities[c].humMaxTime, dataFormatada_HumMax);
+        
+        printf("%s | %-6.2f | %-21s | %-6.2f | %-21s | %.2f\n",
+                c==0 ? "Caxias do Sul    " : "Bento Gonçalves  ", cities[c].humMin, dataFormatada_HumMin, cities[c].humMax, dataFormatada_HumMax,
+                cities[c].humCount ? cities[c].humSum / cities[c].humCount : 0);
+    }
+    printf("\n\n");
+
+    printf("------------------------------------------------------------\n");
+    printf("PRESSÃO ATMOSFÉRICA (hPa)\n");
+    printf("------------------------------------------------------------\n"); 
+    printf("%-17s | %-6s | %-21s | %-6s | %-21s | %s\n", "Cidade", "Mínima", "Data/Hora", "Máxima", "Data/Hora", "Média");
+    printf("-----------------------------------------------------------------------------------------------\n");
+
+    for (int c = 0; c < NUM_DEVICES; c++){
+        char dataFormatada_PresMin[64], dataFormatada_PresMax[64];
+        formatar_data(cities[c].presMinTime, dataFormatada_PresMin);
+        formatar_data(cities[c].presMaxTime, dataFormatada_PresMax);
+        
+        printf("%s | %-6.2f | %-21s | %-6.2f | %-21s | %.2f\n",
+                c==0 ? "Caxias do Sul    " : "Bento Gonçalves  ", cities[c].presMin, dataFormatada_PresMin, cities[c].presMax, dataFormatada_PresMax,
+                cities[c].presCount ? cities[c].presSum / cities[c].presCount : 0);
+    }
+    printf("\n\n");
+
+    printf("------------------------------------------------------------\n");
+    printf("BATERIA\n");
+    printf("------------------------------------------------------------\n");
+    printf("%-17s | %-11s | %-9s | %s\n", "Cidade", "Inicial (V)", "Final (V)", "Consumo (V)");
+    printf("------------------------------------------------------------\n");
     for (int c = 0; c < NUM_DEVICES; c++) {
+        printf("%s | %-11.2f | %-9.2f | %.2f\n",
+                c == 0 ? "Caxias do Sul    " : "Bento Gonçalves  ",
+                cities[c].batteryStart, cities[c].batteryEnd,
+                cities[c].batteryStart - cities[c].batteryEnd);
+    }
+    printf("\n\n");
 
-        // ordenação dos spreading factors
+    printf("------------------------------------------------------------\n");
+    printf("SPREADING FACTORS UTILIZADOS\n");
+    printf("------------------------------------------------------------\n");
+    printf("%-17s | %s\n", "Cidade", "SF utilizados");
+    printf("------------------------------------------------------------\n");
+    for (int c = 0; c < NUM_DEVICES; c++) {
+        
+        // Ordenação Spreading Factors
         int aux;
         for (int i = 0; i < cities[c].sfCount-1; i++) {
             for (int j = 0; j < cities[c].sfCount-1-i; j++) {
@@ -427,39 +481,18 @@ void *statistics_thread(void *arg) {
             }
         }
 
-        char dataFormatada_HumMin[64], dataFormatada_HumMax[64];
-        char dataFormatada_PresMin[64], dataFormatada_PresMax[64];
-
-        formatar_data(cities[c].humMinTime, dataFormatada_HumMin);
-        formatar_data(cities[c].humMaxTime, dataFormatada_HumMax);
-        formatar_data(cities[c].presMinTime, dataFormatada_PresMin);
-        formatar_data(cities[c].presMaxTime, dataFormatada_PresMax);
-
-        // printf("TEMPERATURA: Min %.2f em %s | Max %.2f em %s | Média %.2f\n",
-        //     cities[c].tempMin, dataFormatada_TempMin,
-        //     cities[c].tempMax, dataFormatada_TempMax,
-        //     cities[c].tempCount ? cities[c].tempSum / cities[c].tempCount : 0);
-        printf("UMIDADE: Min %.2f em %s | Max %.2f em %s | Média %.2f\n",
-            cities[c].humMin, dataFormatada_HumMin,
-            cities[c].humMax, dataFormatada_HumMax,
-            cities[c].humCount ? cities[c].humSum / cities[c].humCount : 0);
-        printf("PRESSÃO: Min %.2f em %s | Max %.2f em %s | Média %.2f\n",
-            cities[c].presMin, dataFormatada_PresMin,
-            cities[c].presMax, dataFormatada_PresMax,
-            cities[c].presCount ? cities[c].presSum / cities[c].presCount : 0);
-        printf("BATERIA: Inicial %.2f | Final %.2f | Consumo %.2f\n",
-            cities[c].batteryStart, cities[c].batteryEnd,
-            cities[c].batteryStart - cities[c].batteryEnd);
-        printf("SPREADING FACTORS: ");
-        if (cities[c].sfCount == 0) printf("Nenhum registro de Spreading Factor encontrado");
-        else{
+        printf("%s | ", c == 0 ? "Caxias do Sul    " : "Bento Gonçalves  ");
+        if (cities[c].sfCount == 0) {
+            printf("Nenhum registro de Spreading Factor encontrado\n");
+        } else {
             for (int s = 0; s < cities[c].sfCount; s++) {
                 if (s > 0) printf(", ");
                 printf("SF%d", cities[c].sfUsed[s]);
             }
+            printf("\n");
         }
-        printf("\n\n");
     }
+    printf("\n\n");
 
     log_message(&logQueue, "Statistics computed successfully.");
     pthread_exit(NULL);
@@ -509,7 +542,23 @@ int main() {
 
     clock_gettime(CLOCK_MONOTONIC, &endTime);
     double elapsed = (endTime.tv_sec - startTime.tv_sec) + (endTime.tv_nsec - startTime.tv_nsec)/1e9;
+
+    printf("------------------------------------------------------------\n");
+    printf("DESEMPENHO\n");
+    printf("------------------------------------------------------------\n");
     printf("Tempo total de execução: %.2f segundos\n", elapsed);
+    
+    printf("Threads utilizadas: 4\n");
+    printf(" - Thread 1: registro de logs em background\n");
+    printf(" - Thread 2: leitura do arquivo 1\n");
+    printf(" - Thread 3: leitura do arquivo 2\n");
+    printf(" - Thread 4: cálculo das estatísticas\n\n");
+    
+    printf("Arquivo de log gerado: processamento.log\n\n");
+    
+    printf("============================================================\n");
+    printf("Processamento finalizado com sucesso.\n");
+    printf("============================================================\n");
 
     return 0;
 }
