@@ -5,6 +5,7 @@
 #include <string.h>
 #include <pthread.h>
 #include <time.h>
+#include <math.h>
 #include "yyjson.h"
 
 #define MAX_RECORDS 100000
@@ -54,6 +55,33 @@ typedef struct {
 RecordList globalRecords;
 LogQueue logQueue;
 struct timespec startTime, endTime;
+
+// ---------------- Calcular Diferença em Segundos ----------------
+double calcular_diferenca_segundos(const char *data_antiga, const char *data_nova) {
+    if (data_antiga[0] == '\0') return 999999; // Se for o primeiro registro, deixa passar
+
+    struct tm tm_antiga = {0}, tm_nova = {0};
+    
+    sscanf(data_antiga, "%d-%d-%dT%d:%d:%d", 
+           &tm_antiga.tm_year, &tm_antiga.tm_mon, &tm_antiga.tm_mday, 
+           &tm_antiga.tm_hour, &tm_antiga.tm_min, &tm_antiga.tm_sec);
+           
+    sscanf(data_nova, "%d-%d-%dT%d:%d:%d", 
+           &tm_nova.tm_year, &tm_nova.tm_mon, &tm_nova.tm_mday, 
+           &tm_nova.tm_hour, &tm_nova.tm_min, &tm_nova.tm_sec);
+
+    tm_antiga.tm_year -= 1900;
+    tm_antiga.tm_mon -= 1;
+    tm_nova.tm_year -= 1900;
+    tm_nova.tm_mon -= 1;
+
+    // Converte para Epoch (segundos desde 1970)
+    time_t epoch_antiga = mktime(&tm_antiga);
+    time_t epoch_nova = mktime(&tm_nova);
+
+    // Retorna a diferença (nova - antiga)
+    return difftime(epoch_nova, epoch_antiga);
+}
 
 // ---------------- Logging ----------------
 void log_message(LogQueue *queue, const char *msg) {
@@ -145,20 +173,17 @@ void *file_reader_thread(void *arg) {
 
     yyjson_val *obj;
 
-    double prev_air_press[NUM_DEVICES] = {-999, -999}; // pos 0 == Caxias, pos 1 == Bento
-    double prev_hum[NUM_DEVICES] = {-999, -999}; // pos 0 == Caxias, pos 1 == Bento
-    double prev_temp[NUM_DEVICES] = {-999, -999}; // pos 0 == Caxias, pos 1 == Bento
-    while ((obj = yyjson_arr_iter_next(&iter))) {
-        bool flag_press_rep = false;
-        bool flag_hum_rep = false;
-        bool flag_temp_rep = false;
+    char prev_block_time[NUM_DEVICES][64];
+    for (int i = 0; i < NUM_DEVICES; i++) {
+        prev_block_time[i][0] = '\0';
+    }
 
-        yyjson_val *data_block_date_val = yyjson_obj_get(obj, "created_at");
+    while ((obj = yyjson_arr_iter_next(&iter))) {
         
+        yyjson_val *data_block_date_val = yyjson_obj_get(obj, "created_at");
         if (!data_block_date_val) {
             data_block_date_val = yyjson_obj_get(obj, "payload_date");
         }
-        
         const char *data_block_date = data_block_date_val ? yyjson_get_str(data_block_date_val) : "Data_Desconhecida";
         
         yyjson_val *payload = yyjson_obj_get(obj, "brute_data");
@@ -175,37 +200,52 @@ void *file_reader_thread(void *arg) {
             continue;
         }
 
-        Record rec = {0};
-        strcpy(rec.block_timestamp, data_block_date);
-
         yyjson_val *device_id = yyjson_obj_get(payload, "device_id");
         const char *dev_id_str = yyjson_get_str(device_id);
 
         int dev_index = -1;
-
         for (int k = 0; k < NUM_DEVICES; k++) {
             if (strcmp(devices[k].id, dev_id_str) == 0) {
-                strcpy(rec.city, devices[k].city); // k==0: Caxias, k==1: Bento
                 dev_index = k;
                 break;
             }
         }
 
+        if (dev_index == -1) continue;
+
+        double diferenca_segundos = calcular_diferenca_segundos(prev_block_time[dev_index], data_block_date);
+        double distancia_absoluta = fabs(diferenca_segundos);
+
+        if (distancia_absoluta < 840.0) {
+            snprintf(log, 256, "[DUPLICATA BLOQUEADA] %s | Temp. do último: %.0fs | Arquivo: %s", 
+                     devices[dev_index].city, diferenca_segundos, filename);
+            log_message(&logQueue, log);
+            continue;
+        }
+
+        if (prev_block_time[dev_index][0] != '\0') {
+            snprintf(log, 256, "[DADO ACEITO] %s | Tempo desde último: %.0fs", 
+                     devices[dev_index].city, diferenca_segundos);
+            log_message(&logQueue, log);
+        }
+        
+        strcpy(prev_block_time[dev_index], data_block_date);
+
+        Record rec = {0};
+        strcpy(rec.block_timestamp, data_block_date);
+        strcpy(rec.city, devices[dev_index].city);
+
         yyjson_arr_iter data_iter;
         yyjson_arr_iter_init(dataArr, &data_iter);
-
         yyjson_val *item;
+
         while ((item = yyjson_arr_iter_next(&data_iter))) {
 
             yyjson_val *var  = yyjson_obj_get(item, "variable");
             yyjson_val *val  = yyjson_obj_get(item, "value");
             yyjson_val *time = yyjson_obj_get(item, "time");
 
-            if (!var || !val || !time) {
-                snprintf(log, 256, "Faltou info: variable:%s | value:%s | time:%s no arquivo %s\n", yyjson_get_str(var),yyjson_get_str(val),yyjson_get_str(time),filename);
-                log_message(&logQueue, log);
-                continue;
-            }
+            if (!var || !val || !time) continue;
 
             const char *var_str  = yyjson_get_str(var);
             const char *time_str = yyjson_get_str(time);
@@ -214,47 +254,30 @@ void *file_reader_thread(void *arg) {
                 double v = yyjson_get_num(val);
                 
                 if (strcmp(var_str, "temperature") == 0) {
-
-                    if (v == prev_temp[dev_index]) {
-                        flag_temp_rep = true;
-                    }
-
                     rec.temperature = v;
-                    prev_temp[dev_index] = v;
                     strcpy(rec.temp_timestamp, time_str);
                 }
                 else if (strcmp(var_str, "humidity") == 0) {
-                    if (v == prev_hum[dev_index]) {
-                        flag_hum_rep = true;
-                    }
                     rec.humidity = v;
-                    prev_hum[dev_index] = v;
                     strcpy(rec.hum_timestamp, time_str);
                 }
                 else if (strcmp(var_str, "airpressure") == 0) {
-                    if (v == prev_air_press[dev_index]) {
-                        flag_press_rep = true;
-                    }
                     rec.pressure = v;
-                    prev_air_press[dev_index] = v;
                     strcpy(rec.pres_timestamp, time_str);
                 }
                 else if (strcmp(var_str, "batterylevel") == 0) {
                     rec.battery = v;
                     strcpy(rec.bat_timestamp, time_str);
                 } 
-                else if (strcmp(var_str, "lora_spreading_factor") == 0) rec.sf = (int)v;
+                else if (strcmp(var_str, "lora_spreading_factor") == 0) {
+                    rec.sf = (int)v;
+                }
             }
         }
-        if (flag_press_rep && flag_hum_rep && flag_temp_rep) {
-            snprintf(log, 256, "Registro de dados repetidos ignorados: %s | %s no arquivo %s\n", rec.city, data_block_date, filename);
-            log_message(&logQueue, log);
-        }
-        else { 
-            pthread_mutex_lock(&globalRecords.mutex);
-            globalRecords.records[globalRecords.count++] = rec;
-            pthread_mutex_unlock(&globalRecords.mutex);
-        }
+        
+        pthread_mutex_lock(&globalRecords.mutex);
+        globalRecords.records[globalRecords.count++] = rec;
+        pthread_mutex_unlock(&globalRecords.mutex);
     }
     
     yyjson_doc_free(doc);
