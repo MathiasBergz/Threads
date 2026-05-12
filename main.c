@@ -560,5 +560,9 @@ int main() {
     printf("Processamento finalizado com sucesso.\n");
     printf("============================================================\n");
 
+    pthread_mutex_destroy(&globalRecords.mutex);
+    pthread_mutex_destroy(&logQueue.mutex);
+    pthread_cond_destroy(&logQueue.cond);
+
     return 0;
 }
