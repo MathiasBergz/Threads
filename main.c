@@ -178,33 +178,31 @@ void *file_reader_thread(void *arg) {
         prev_block_time[i][0] = '\0';
     }
 
+    int cont_lidos = 0;
+    int cont_adicionados = 0;
+    int cont_caxias = 0;
+    int cont_bento = 0;
+    int cont_duplicatas = 0;
+
     while ((obj = yyjson_arr_iter_next(&iter))) {
+        cont_lidos++;
         
         yyjson_val *data_block_date_val = yyjson_obj_get(obj, "created_at");
         if (!data_block_date_val) {
             data_block_date_val = yyjson_obj_get(obj, "payload_date");
         }
         const char *data_block_date = data_block_date_val ? yyjson_get_str(data_block_date_val) : "Data_Desconhecida";
-
-        yyjson_val *id_val = yyjson_obj_get(obj, "id");
-        if (!id_val) {
-            id_val = yyjson_obj_get(obj, "payload_id");
-        }
-        long long block_id = id_val ? yyjson_get_int(id_val) : -1;
         
+        yyjson_val *id_val = yyjson_obj_get(obj, "id");
+        if (!id_val) id_val = yyjson_obj_get(obj, "payload_id");
+        long long block_id = id_val ? yyjson_get_int(id_val) : -1;
+
         yyjson_val *payload = yyjson_obj_get(obj, "brute_data");
         if (!payload) payload = yyjson_obj_get(obj, "payload");
-        if (!payload) {
-            snprintf(log, 256, "Não achou payload no arquivo %s\n", filename);
-            log_message(&logQueue, log);
-            continue;
-        }
+        if (!payload) continue;
+        
         yyjson_val *dataArr = yyjson_obj_get(payload, "data");
-        if (!yyjson_is_arr(dataArr)) {
-            snprintf(log, 256, "Não achou dataArr no arquivo %s\n", filename);
-            log_message(&logQueue, log);
-            continue;
-        }
+        if (!yyjson_is_arr(dataArr)) continue;
 
         yyjson_val *device_id = yyjson_obj_get(payload, "device_id");
         const char *dev_id_str = yyjson_get_str(device_id);
@@ -226,6 +224,8 @@ void *file_reader_thread(void *arg) {
             snprintf(log, 256, "[DUPLICATA BLOQUEADA] %s | ID: %lld | Tempo do último: %.0fs | Arquivo: %s", 
                      devices[dev_index].city, block_id, diferenca_segundos, filename);
             log_message(&logQueue, log);
+            
+            cont_duplicatas++;
             continue;
         }
 
@@ -236,6 +236,10 @@ void *file_reader_thread(void *arg) {
         }
         
         strcpy(prev_block_time[dev_index], data_block_date);
+
+        cont_adicionados++;
+        if (dev_index == 0) cont_caxias++;
+        else cont_bento++;
 
         Record rec = {0};
         strcpy(rec.block_timestamp, data_block_date);
@@ -286,6 +290,10 @@ void *file_reader_thread(void *arg) {
         pthread_mutex_unlock(&globalRecords.mutex);
     }
     
+    snprintf(log, 256, "RESUMO \"%s\": %d lidos, %d adicionados (Caxias=%d, Bento=%d), %d duplicatas", 
+             filename, cont_lidos, cont_adicionados, cont_caxias, cont_bento, cont_duplicatas);
+    log_message(&logQueue, log);
+
     yyjson_doc_free(doc);
     pthread_exit(NULL);
 }
