@@ -299,6 +299,13 @@ void *file_reader_thread(void *arg) {
         pthread_mutex_unlock(&globalRecords.mutex);
         strcpy(file->periodo_fim,data_block_date);
     }
+
+    char aux[64];
+    if (strcmp(file->periodo_inicio, file->periodo_fim) > 0) {
+        strcpy(aux, file->periodo_inicio);
+        strcpy(file->periodo_inicio, file->periodo_fim);
+        strcpy(file->periodo_fim, aux);
+    }
     
     file->qtd_registros = cont_lidos;
 
@@ -437,10 +444,25 @@ void *statistics_thread(void *arg) {
     printf("============================================================\n\n");
 
     char StartPeriod_Formatado[64], EndPeriod_Formatado[64];
-    for(int i = 0; i < QTD_ARQUIVOS; i++){
+    for (int i = 0; i < QTD_ARQUIVOS; i++){
+        formatar_data_curta(files[i].periodo_inicio, StartPeriod_Formatado);
+        formatar_data_curta(files[i].periodo_fim, EndPeriod_Formatado);
+
         printf("Arquivo analisado: %s\n",files[i].filename);
         printf("Total de registros: %d\n",files[i].qtd_registros);
-        printf("Período analisado: %s a %s\n",files[i].periodo_inicio,files[i].periodo_fim);
+        printf("Período analisado: %s a %s\n",StartPeriod_Formatado,EndPeriod_Formatado);
+        printf("\n");
+    }
+
+    for (int i = 0; i < NUM_DEVICES; i++) {
+        char periodStartFormatada[64], periodEndFormatada[64];
+        formatar_data_curta(cities[i].periodStart, periodStartFormatada);
+        formatar_data_curta(cities[i].periodEnd, periodEndFormatada);
+
+        printf("Cidade: %s\n", cities[i].city);
+        printf("Total de registros válidos: %d\n", cities[i].totalRegCount);
+        printf("Período dos dados: %s a %s\n", periodStartFormatada, periodEndFormatada);
+        printf("\n");
     }
 
     printf("------------------------------------------------------------\n");
