@@ -31,6 +31,8 @@ typedef struct {
 typedef struct {
     const char *filename;
     int qtd_registros;
+    int qtd_reg_validos;
+    int qtd_duplicatas;
     char periodo_inicio[64];
     char periodo_fim[64];
 } Arquivos;
@@ -229,7 +231,7 @@ void *file_reader_thread(void *arg) {
         double diferenca_segundos = calcular_diferenca_segundos(prev_block_time[dev_index], data_block_date);
         double distancia_absoluta = fabs(diferenca_segundos);
 
-        if (distancia_absoluta < 800.0) {
+        if (distancia_absoluta < 780.0) {
             snprintf(log, 256, "[DUPLICATA] %s | ID: %lld | Tempo do último: %.0fs | Arquivo: %s", 
                      devices[dev_index].city, block_id, diferenca_segundos, file->filename);
             log_message(&logQueue, log);
@@ -237,13 +239,7 @@ void *file_reader_thread(void *arg) {
             cont_duplicatas++;
             continue;
         }
-        /* Printar dados aceitos
-        if (prev_block_time[dev_index][0] != '\0') {
-            snprintf(log, 256, "[DADO ACEITO] %s | ID: %lld | Tempo desde último: %.0fs | Arquivo: %s", 
-                     devices[dev_index].city, block_id, diferenca_segundos, file->filename);
-            log_message(&logQueue, log);
-        }
-        */
+        
         strcpy(prev_block_time[dev_index], data_block_date);
 
         cont_adicionados++;
@@ -308,6 +304,8 @@ void *file_reader_thread(void *arg) {
     }
     
     file->qtd_registros = cont_lidos;
+    file->qtd_reg_validos = cont_adicionados;
+    file->qtd_duplicatas = cont_duplicatas;
 
     snprintf(log, 256, "RESUMO \"%s\": %d lidos, %d adicionados (Caxias=%d, Bento=%d), %d duplicatas", 
              file->filename, file->qtd_registros, cont_adicionados, cont_caxias, cont_bento, cont_duplicatas);
@@ -450,16 +448,23 @@ void *statistics_thread(void *arg) {
 
         printf("Arquivo analisado: %s\n",files[i].filename);
         printf("Total de registros: %d\n",files[i].qtd_registros);
+        printf("Registros válidos: %d\n",files[i].qtd_reg_validos);
+        printf("Registros duplicados: %d (%.2f%%)\n",files[i].qtd_duplicatas, files[i].qtd_registros > 0 ? (float)files[i].qtd_duplicatas / files[i].qtd_registros * 100 : 0);
         printf("Período analisado: %s a %s\n",StartPeriod_Formatado,EndPeriod_Formatado);
         printf("\n");
     }
-
+    printf("------------------------------------------------------------\n");
+    printf("Total de registros lidos: %d\n", files[0].qtd_registros + files[1].qtd_registros);
+    printf("Total de registros válidos: %d\n", globalRecords.count);
+    printf("Total de registros duplicados: %d (%.2f%%)\n", files[0].qtd_duplicatas + files[1].qtd_duplicatas, (files[0].qtd_registros + files[1].qtd_registros) > 0 ? (float)(files[0].qtd_duplicatas + files[1].qtd_duplicatas) / (files[0].qtd_registros + files[1].qtd_registros) * 100 : 0);
+    
+    printf("\n------------------------------------------------------------\n");
     for (int i = 0; i < NUM_DEVICES; i++) {
         char periodStartFormatada[64], periodEndFormatada[64];
         formatar_data_curta(cities[i].periodStart, periodStartFormatada);
         formatar_data_curta(cities[i].periodEnd, periodEndFormatada);
 
-        printf("Cidade: %s\n", cities[i].city);
+        printf("Cidade analisada: %s\n", cities[i].city);
         printf("Total de registros válidos: %d\n", cities[i].totalRegCount);
         printf("Período dos dados: %s a %s\n", periodStartFormatada, periodEndFormatada);
         printf("\n");
