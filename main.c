@@ -12,6 +12,7 @@
 #define LOG_QUEUE_SIZE 1000
 #define MAX_SF 6
 #define NUM_DEVICES 2
+#define QTD_ARQUIVOS 2
 
 typedef struct {
     char city[64];
@@ -28,6 +29,13 @@ typedef struct {
 } Record;
 
 typedef struct {
+    const char *filename;
+    int qtd_registros;
+    char periodo_inicio[64];
+    char periodo_fim[64];
+} Arquivos;
+
+typedef struct {
     Record records[MAX_RECORDS];
     int count;
     pthread_mutex_t mutex;
@@ -42,13 +50,9 @@ typedef struct {
 } LogQueue;
 
 typedef struct {
-    const char *filename;
-    const char *city;
-} FileThreadData;
-
-typedef struct {
     RecordList *records;
     LogQueue *logQueue;
+    Arquivos *arqs;
 } StatsThreadData;
 
 // Global variables
@@ -122,15 +126,15 @@ void *logging_thread(void *arg) {
 
 // ---------------- File Reader ----------------
 void *file_reader_thread(void *arg) {
-    const char *filename = (const char *) arg;
+    Arquivos *file = (Arquivos *) arg;
     char log[256];
 
-    snprintf(log, 256, "Thread iniciada: Abrindo arquivo %s para leitura", filename);
+    snprintf(log, 256, "Thread iniciada: Abrindo arquivo %s para leitura", file->filename);
     log_message(&logQueue, log);
 
-    FILE *fp = fopen(filename, "r");
+    FILE *fp = fopen(file->filename, "r");
     if (!fp) {
-        snprintf(log, 256, "Error opening file: %s", filename);
+        snprintf(log, 256, "Error opening file: %s", file->filename);
         log_message(&logQueue, log);
         pthread_exit(NULL);
     }
@@ -149,12 +153,12 @@ void *file_reader_thread(void *arg) {
     yyjson_val *root = yyjson_doc_get_root(doc);
 
     if (!root || !yyjson_is_arr(root)) {
-        snprintf(log, 256, "Invalid JSON in file: %s", filename);
+        snprintf(log, 256, "Invalid JSON in file: %s", file->filename);
         log_message(&logQueue, log);
         pthread_exit(NULL);
     }
 
-    snprintf(log, 256, "File loaded: %s, records: %zu", filename, yyjson_arr_size(root));
+    snprintf(log, 256, "File loaded: %s, records: %zu", file->filename, yyjson_arr_size(root));
     log_message(&logQueue, log);
 
     typedef struct {
@@ -183,7 +187,7 @@ void *file_reader_thread(void *arg) {
     int cont_caxias = 0;
     int cont_bento = 0;
     int cont_duplicatas = 0;
-
+    bool flag_data = false;
     while ((obj = yyjson_arr_iter_next(&iter))) {
         cont_lidos++;
         
@@ -193,6 +197,11 @@ void *file_reader_thread(void *arg) {
         }
         const char *data_block_date = data_block_date_val ? yyjson_get_str(data_block_date_val) : "Data_Desconhecida";
         
+        if(!flag_data){
+            strcpy(file->periodo_inicio,data_block_date);
+            flag_data = true;
+        }
+
         yyjson_val *id_val = yyjson_obj_get(obj, "id");
         if (!id_val) id_val = yyjson_obj_get(obj, "payload_id");
         long long block_id = id_val ? yyjson_get_int(id_val) : -1;
@@ -221,20 +230,20 @@ void *file_reader_thread(void *arg) {
         double distancia_absoluta = fabs(diferenca_segundos);
 
         if (distancia_absoluta < 800.0) {
-            snprintf(log, 256, "[DUPLICATA BLOQUEADA] %s | ID: %lld | Tempo do último: %.0fs | Arquivo: %s", 
-                     devices[dev_index].city, block_id, diferenca_segundos, filename);
+            snprintf(log, 256, "[DUPLICATA] %s | ID: %lld | Tempo do último: %.0fs | Arquivo: %s", 
+                     devices[dev_index].city, block_id, diferenca_segundos, file->filename);
             log_message(&logQueue, log);
             
             cont_duplicatas++;
             continue;
         }
-
+        /* Printar dados aceitos
         if (prev_block_time[dev_index][0] != '\0') {
             snprintf(log, 256, "[DADO ACEITO] %s | ID: %lld | Tempo desde último: %.0fs | Arquivo: %s", 
-                     devices[dev_index].city, block_id, diferenca_segundos, filename);
+                     devices[dev_index].city, block_id, diferenca_segundos, file->filename);
             log_message(&logQueue, log);
         }
-        
+        */
         strcpy(prev_block_time[dev_index], data_block_date);
 
         cont_adicionados++;
@@ -288,10 +297,13 @@ void *file_reader_thread(void *arg) {
         pthread_mutex_lock(&globalRecords.mutex);
         globalRecords.records[globalRecords.count++] = rec;
         pthread_mutex_unlock(&globalRecords.mutex);
+        strcpy(file->periodo_fim,data_block_date);
     }
     
+    file->qtd_registros = cont_lidos;
+
     snprintf(log, 256, "RESUMO \"%s\": %d lidos, %d adicionados (Caxias=%d, Bento=%d), %d duplicatas", 
-             filename, cont_lidos, cont_adicionados, cont_caxias, cont_bento, cont_duplicatas);
+             file->filename, file->qtd_registros, cont_adicionados, cont_caxias, cont_bento, cont_duplicatas);
     log_message(&logQueue, log);
 
     yyjson_doc_free(doc);
@@ -326,9 +338,9 @@ void formatar_data_curta(const char *data_original, char *data_formatada) {
 void *statistics_thread(void *arg) {
     StatsThreadData *data = (StatsThreadData *)arg;
     RecordList *records = data->records;
-
+    Arquivos *files = data->arqs;
     char log[256];
-    snprintf(log, 256, "Iniciando calculo estatistico para %d registros validos.", records->count);
+    snprintf(log, 256, "Iniciando cálculo estatístico para %d registros válidos.", records->count);
     log_message(&logQueue, log);
 
     typedef struct {
@@ -425,14 +437,10 @@ void *statistics_thread(void *arg) {
     printf("============================================================\n\n");
 
     char StartPeriod_Formatado[64], EndPeriod_Formatado[64];
-    for (int c = 0; c < NUM_DEVICES; c++) {
-        char f_start[64], f_end[64];
-        formatar_data_curta(cities[c].periodStart, StartPeriod_Formatado);
-        formatar_data_curta(cities[c].periodEnd, EndPeriod_Formatado);
-        
-        printf("Cidade Analisada: %s\n", cities[c].city);
-        printf("Total de registros processados: %d\n", cities[c].totalRegCount);
-        printf("Período analisado: %s a %s\n\n", StartPeriod_Formatado, EndPeriod_Formatado);
+    for(int i = 0; i < QTD_ARQUIVOS; i++){
+        printf("Arquivo analisado: %s\n",files[i].filename);
+        printf("Total de registros: %d\n",files[i].qtd_registros);
+        printf("Período analisado: %s a %s\n",files[i].periodo_inicio,files[i].periodo_fim);
     }
 
     printf("------------------------------------------------------------\n");
@@ -554,13 +562,15 @@ int main() {
     log_message(&logQueue, "Sistema inicializado. Estruturas e mutexes criados.");
 
     // File reading threads
-    const char *f1 = "files/mqtt_senzemo_cx_bg.json";
-    const char *f2 = "files/senzemo_cx_bg.json";
+    Arquivos arquivos[2];
+
+    arquivos[0].filename = "files/mqtt_senzemo_cx_bg.json";
+    arquivos[1].filename = "files/senzemo_cx_bg.json";
 
     log_message(&logQueue, "Iniciando threads de leitura dos arquivos JSON...");
 
-    pthread_create(&threads[1], NULL, file_reader_thread, (void *) f1);
-    pthread_create(&threads[2], NULL, file_reader_thread, (void *) f2);
+    pthread_create(&threads[1], NULL, file_reader_thread, (void *) &arquivos[0]);
+    pthread_create(&threads[2], NULL, file_reader_thread, (void *) &arquivos[1]);
 
     // Wait for file threads
     pthread_join(threads[1], NULL);
@@ -569,7 +579,7 @@ int main() {
     log_message(&logQueue, "Leitura de todos os arquivos concluida. Iniciando analise de dados...");
 
     // Start statistics thread
-    StatsThreadData statsData = {&globalRecords, &logQueue};
+    StatsThreadData statsData = {&globalRecords, &logQueue, arquivos};
     pthread_create(&threads[3], NULL, statistics_thread, &statsData);
     pthread_join(threads[3], NULL);
 
