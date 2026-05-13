@@ -435,6 +435,8 @@ void *statistics_thread(void *arg) {
     }
     pthread_mutex_unlock(&records->mutex);
 
+    log_message(&logQueue, "Iniciando escrita dos resultados no terminal");    
+
     // Print results
     printf("============================================================\n");
     printf("ANÁLISE DE DADOS DOS SENSORES - CityLivingLab\n");
@@ -452,12 +454,18 @@ void *statistics_thread(void *arg) {
         printf("Registros duplicados: %d (%.2f%%)\n",files[i].qtd_duplicatas, files[i].qtd_registros > 0 ? (float)files[i].qtd_duplicatas / files[i].qtd_registros * 100 : 0);
         printf("Período analisado: %s a %s\n",StartPeriod_Formatado,EndPeriod_Formatado);
         printf("\n");
+
+        snprintf(log, 256, "Arquivo: %s | Registros totais: %d | Registros válidos: %d | Registros duplicados: %d (%.2f%%) | Período analisado: %s a %s", files[i].filename, files[i].qtd_registros, files[i].qtd_reg_validos, files[i].qtd_duplicatas, (files[i].qtd_registros > 0 ? (float)files[i].qtd_duplicatas / files[i].qtd_registros * 100 : 0), StartPeriod_Formatado, EndPeriod_Formatado);
+        log_message(&logQueue, log);
     }
     printf("------------------------------------------------------------\n");
     printf("Total de registros lidos: %d\n", files[0].qtd_registros + files[1].qtd_registros);
     printf("Total de registros válidos: %d\n", globalRecords.count);
     printf("Total de registros duplicados: %d (%.2f%%)\n", files[0].qtd_duplicatas + files[1].qtd_duplicatas, (files[0].qtd_registros + files[1].qtd_registros) > 0 ? (float)(files[0].qtd_duplicatas + files[1].qtd_duplicatas) / (files[0].qtd_registros + files[1].qtd_registros) * 100 : 0);
-    
+
+    snprintf(log, 256, "Registros totais: %d | Registros válidos: %d | Registros duplicados: %d (%.2f%%)", files[0].qtd_registros + files[1].qtd_registros, files[0].qtd_reg_validos + files[1].qtd_reg_validos, files[0].qtd_duplicatas + files[1].qtd_duplicatas, (files[0].qtd_registros + files[1].qtd_registros) > 0 ? (float)(files[0].qtd_duplicatas + files[1].qtd_duplicatas) / (files[0].qtd_registros + files[1].qtd_registros) * 100 : 0);
+    log_message(&logQueue, log);
+
     printf("\n------------------------------------------------------------\n");
     for (int i = 0; i < NUM_DEVICES; i++) {
         char periodStartFormatada[64], periodEndFormatada[64];
@@ -468,6 +476,9 @@ void *statistics_thread(void *arg) {
         printf("Total de registros válidos: %d\n", cities[i].totalRegCount);
         printf("Período dos dados: %s a %s\n", periodStartFormatada, periodEndFormatada);
         printf("\n");
+
+        snprintf(log, 256, "Cidade: %s | Registros válidos: %d | Período: %s a %s", cities[i].city, cities[i].totalRegCount, periodStartFormatada, periodEndFormatada);
+        log_message(&logQueue, log);
     }
 
     printf("------------------------------------------------------------\n");
