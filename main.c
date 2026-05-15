@@ -179,6 +179,11 @@ void *file_reader_thread(void *arg) {
 
     yyjson_val *obj;
 
+    double prev_air_press[NUM_DEVICES] = {-999, -999}; // pos 0 == Caxias, pos 1 == Bento
+    double prev_hum[NUM_DEVICES] = {-999, -999}; // pos 0 == Caxias, pos 1 == Bento
+    double prev_temp[NUM_DEVICES] = {-999, -999}; // pos 0 == Caxias, pos 1 == Bento
+    double prev_battery[NUM_DEVICES] = {-999, -999}; // pos 0 == Caxias, pos 1 == Bento
+
     char prev_block_time[NUM_DEVICES][64];
     for (int i = 0; i < NUM_DEVICES; i++) {
         prev_block_time[i][0] = '\0';
@@ -191,6 +196,11 @@ void *file_reader_thread(void *arg) {
     int cont_duplicatas = 0;
     bool flag_data = false;
     while ((obj = yyjson_arr_iter_next(&iter))) {
+        bool flag_press_rep = false;
+        bool flag_hum_rep = false;
+        bool flag_temp_rep = false;
+        bool flag_bat_rep = false;
+
         cont_lidos++;
         
         yyjson_val *data_block_date_val = yyjson_obj_get(obj, "created_at");
@@ -228,24 +238,6 @@ void *file_reader_thread(void *arg) {
 
         if (dev_index == -1) continue;
 
-        double diferenca_segundos = calcular_diferenca_segundos(prev_block_time[dev_index], data_block_date);
-        double distancia_absoluta = fabs(diferenca_segundos);
-
-        if (distancia_absoluta < 780.0) {
-            snprintf(log, 256, "[DUPLICATA] %s | ID: %lld | Tempo do último: %.0fs | Arquivo: %s", 
-                     devices[dev_index].city, block_id, diferenca_segundos, file->filename);
-            log_message(&logQueue, log);
-            
-            cont_duplicatas++;
-            continue;
-        }
-        
-        strcpy(prev_block_time[dev_index], data_block_date);
-
-        cont_adicionados++;
-        if (dev_index == 0) cont_caxias++;
-        else cont_bento++;
-
         Record rec = {0};
         strcpy(rec.block_timestamp, data_block_date);
         strcpy(rec.city, devices[dev_index].city);
@@ -260,7 +252,11 @@ void *file_reader_thread(void *arg) {
             yyjson_val *val  = yyjson_obj_get(item, "value");
             yyjson_val *time = yyjson_obj_get(item, "time");
 
-            if (!var || !val || !time) continue;
+            if (!var || !val || !time) {
+                snprintf(log, 256, "Faltou info: variable:%s | value:%s | time:%s no arquivo %s\n", yyjson_get_str(var),yyjson_get_str(val),yyjson_get_str(time), file->filename);
+                log_message(&logQueue, log);
+                continue;
+            }
 
             const char *var_str  = yyjson_get_str(var);
             const char *time_str = yyjson_get_str(time);
@@ -269,31 +265,69 @@ void *file_reader_thread(void *arg) {
                 double v = yyjson_get_num(val);
                 
                 if (strcmp(var_str, "temperature") == 0) {
+
+                    if (v == prev_temp[dev_index]) {
+                        flag_temp_rep = true;
+                    }
+
                     rec.temperature = v;
+                    prev_temp[dev_index] = v;
                     strcpy(rec.temp_timestamp, time_str);
                 }
                 else if (strcmp(var_str, "humidity") == 0) {
+                    if (v == prev_hum[dev_index]) {
+                        flag_hum_rep = true;
+                    }
                     rec.humidity = v;
+                    prev_hum[dev_index] = v;
                     strcpy(rec.hum_timestamp, time_str);
                 }
                 else if (strcmp(var_str, "airpressure") == 0) {
+                    if (v == prev_air_press[dev_index]) {
+                        flag_press_rep = true;
+                    }
                     rec.pressure = v;
+                    prev_air_press[dev_index] = v;
                     strcpy(rec.pres_timestamp, time_str);
                 }
                 else if (strcmp(var_str, "batterylevel") == 0) {
+                    if (v == prev_battery[dev_index]) {
+                        flag_bat_rep = true;
+                    }
                     rec.battery = v;
+                    prev_battery[dev_index] = v;
                     strcpy(rec.bat_timestamp, time_str);
-                } 
-                else if (strcmp(var_str, "lora_spreading_factor") == 0) {
-                    rec.sf = (int)v;
                 }
+                else if (strcmp(var_str, "lora_spreading_factor") == 0) rec.sf = (int)v;
             }
         }
+
+
+        double diferenca_segundos = calcular_diferenca_segundos(prev_block_time[dev_index], data_block_date);
+        double distancia_absoluta = fabs(diferenca_segundos);
+
+        if ((distancia_absoluta < 780.0) && (flag_temp_rep && flag_hum_rep && flag_press_rep && flag_bat_rep)) {
+            snprintf(log, 256, "[DUPLICATA] %s | ID: %lld | Tempo do último: %.0fs | Arquivo: %s", 
+                    devices[dev_index].city, block_id, distancia_absoluta, file->filename);
+            log_message(&logQueue, log);
+        
+            cont_duplicatas++;
+            continue;
+            
+        }
+
+        cont_adicionados++;
+        if (dev_index == 0) cont_caxias++;
+        else cont_bento++;
+
+        strcpy(prev_block_time[dev_index], data_block_date);
         
         pthread_mutex_lock(&globalRecords.mutex);
         globalRecords.records[globalRecords.count++] = rec;
         pthread_mutex_unlock(&globalRecords.mutex);
-        strcpy(file->periodo_fim,data_block_date);
+
+
+        strcpy(file->periodo_fim,data_block_date); 
     }
 
     char aux[64];
