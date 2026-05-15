@@ -302,7 +302,6 @@ void *file_reader_thread(void *arg) {
             }
         }
 
-
         double diferenca_segundos = calcular_diferenca_segundos(prev_block_time[dev_index], data_block_date);
         double distancia_absoluta = fabs(diferenca_segundos);
 
@@ -341,7 +340,7 @@ void *file_reader_thread(void *arg) {
     file->qtd_reg_validos = cont_adicionados;
     file->qtd_duplicatas = cont_duplicatas;
 
-    snprintf(log, 256, "RESUMO \"%s\": %d lidos, %d adicionados (Caxias=%d, Bento=%d), %d duplicatas", 
+    snprintf(log, 256, "REGISTROS DE \"%s\": %d lidos, %d adicionados (Caxias=%d, Bento=%d), %d duplicatas", 
              file->filename, file->qtd_registros, cont_adicionados, cont_caxias, cont_bento, cont_duplicatas);
     log_message(&logQueue, log);
 
