@@ -127,10 +127,12 @@ void *logging_thread(void *arg) {
         queue->head = (queue->head + 1) % LOG_QUEUE_SIZE;
         pthread_mutex_unlock(&queue->mutex);
 
-        if (strcmp(msg, "END") == 0) break;
-
         fprintf(logFile, "%s\n", msg);
         fflush(logFile);
+
+        if (strstr(msg, "] END") != NULL) {
+            break;
+        }
     }
 
     fclose(logFile);
