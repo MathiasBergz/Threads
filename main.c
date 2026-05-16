@@ -60,7 +60,6 @@ typedef struct {
 // Global variables
 RecordList globalRecords;
 LogQueue logQueue;
-struct timespec startTime, endTime;
 
 // ---------------- Calcular Diferença em Segundos ----------------
 double calcular_diferenca_segundos(const char *data_antiga, const char *data_nova) {
@@ -141,6 +140,9 @@ void *logging_thread(void *arg) {
 
 // ---------------- File Reader ----------------
 void *file_reader_thread(void *arg) {
+    struct timespec startTime, endTime;
+    clock_gettime(CLOCK_MONOTONIC, &startTime);
+
     Arquivos *file = (Arquivos *) arg;
     char log[256];
 
@@ -394,6 +396,12 @@ void *file_reader_thread(void *arg) {
     log_message(&logQueue, log);
 
     yyjson_doc_free(doc);
+
+    clock_gettime(CLOCK_MONOTONIC, &endTime);
+    double thread_elapsed = (endTime.tv_sec - startTime.tv_sec) + (endTime.tv_nsec - startTime.tv_nsec)/1e9;
+
+    snprintf(log, 256, "[file_reader_thread]: \"%s\" processado em %.3f segundos.", file->filename, thread_elapsed);
+    log_message(&logQueue, log);
     pthread_exit(NULL);
 }
 
@@ -423,6 +431,9 @@ void formatar_data_curta(const char *data_original, char *data_formatada) {
 
 // ---------------- Statistics ----------------
 void *statistics_thread(void *arg) {
+    struct timespec startTime, endTime;
+    clock_gettime(CLOCK_MONOTONIC, &startTime);
+
     StatsThreadData *data = (StatsThreadData *)arg;
     RecordList *records = data->records;
     Arquivos *files = data->arqs;
@@ -695,11 +706,20 @@ void *statistics_thread(void *arg) {
     printf("\n\n");
 
     log_message(&logQueue, "[statistics_thread]: Statistics computed successfully.");
+
+    clock_gettime(CLOCK_MONOTONIC, &endTime);
+    double thread_elapsed = (endTime.tv_sec - startTime.tv_sec) + (endTime.tv_nsec - startTime.tv_nsec)/1e9;
+
+    snprintf(log, 256, "[statistics_thread]: Escritas e cálculos de estatísticas concluídos em %.3f segundos.", thread_elapsed);
+    log_message(&logQueue, log);
     pthread_exit(NULL);
 }
 
 // ---------------- Main ----------------
 int main() {
+    struct timespec startTime, endTime;
+    clock_gettime(CLOCK_MONOTONIC, &startTime);
+
     pthread_t threads[4];
     char log[256];
 
@@ -709,8 +729,6 @@ int main() {
     logQueue.head = logQueue.tail = 0;
     pthread_mutex_init(&logQueue.mutex, NULL);
     pthread_cond_init(&logQueue.cond, NULL);
-
-    clock_gettime(CLOCK_MONOTONIC, &startTime);
 
     // Start logging thread
     pthread_create(&threads[0], NULL, logging_thread, &logQueue);
