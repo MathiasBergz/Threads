@@ -151,7 +151,7 @@ void *file_reader_thread(void *arg) {
 
     FILE *fp = fopen(file->filename, "r");
     if (!fp) {
-        snprintf(log, 256, "[file_reader_thread]:Error opening file: %s\n", file->filename);
+        snprintf(log, 256, "[file_reader_thread]: Erro ao abrir arquivo: %s\n", file->filename);
         log_message(&logQueue, log);
         pthread_exit(NULL);
     }
@@ -170,12 +170,12 @@ void *file_reader_thread(void *arg) {
     yyjson_val *root = yyjson_doc_get_root(doc);
 
     if (!root || !yyjson_is_arr(root)) {
-        snprintf(log, 256, "[file_reader_thread]:Invalid JSON in file: %s\n", file->filename);
+        snprintf(log, 256, "[file_reader_thread]: Arquivo JSON inválido: %s\n", file->filename);
         log_message(&logQueue, log);
         pthread_exit(NULL);
     }
 
-    snprintf(log, 256, "[file_reader_thread]: File loaded: %s, records: %zu\n", file->filename, yyjson_arr_size(root));
+    snprintf(log, 256, "[file_reader_thread]: Arquivo carregado: %s, registros: %zu\n", file->filename, yyjson_arr_size(root));
     log_message(&logQueue, log);
 
     typedef struct {
@@ -473,6 +473,7 @@ void *statistics_thread(void *arg) {
     }
 
     pthread_mutex_lock(&records->mutex);
+    log_message(&logQueue, "[statistics_thread]: Encontrando valores máximo e mínimo e calculando média dos dados.\n");
     for (int i = 0; i < records->count; i++) {
         Record r = records->records[i];
         CityStats *city = NULL;
@@ -526,9 +527,10 @@ void *statistics_thread(void *arg) {
         for (int s = 0; s < city->sfCount; s++) if (city->sfUsed[s] == r.sf) found = 1;
         if (!found && r.sf && city->sfCount < MAX_SF) city->sfUsed[city->sfCount++] = r.sf;
     }
+    log_message(&logQueue, "[statistics_thread]: Coleta e calculo de dados estatísticos concluídos.\n");
     pthread_mutex_unlock(&records->mutex);
 
-    log_message(&logQueue, "[statistics_thread]: Iniciando cálculo de médias e escrita dos resultados finais.\n");    
+    log_message(&logQueue, "[statistics_thread]: Iniciando escrita dos resultados finais.\n");    
 
     // Print results
     printf("============================================================\n");
@@ -577,7 +579,7 @@ void *statistics_thread(void *arg) {
         snprintf(log, 512, "[statistics_thread]: Cidade: %s | Registros válidos: %d | Período: %s a %s\n", cities[i].city, cities[i].totalRegCount, periodStartFormatada, periodEndFormatada);
         log_message(&logQueue, log);
     }
-    log_message(&logQueue, "[statistics_thread]: Escrevendo estatísticas e calculando valores mínimos, máximos e médias dem temperatura por cidade.\n");
+    log_message(&logQueue, "[statistics_thread]: Escrevendo estatísticas dos valores mínimos, máximos e médias de temperatura por cidade.\n");
     printf("------------------------------------------------------------\n");
     printf("TEMPERATURA (°C)\n");
     printf("------------------------------------------------------------\n"); 
@@ -600,7 +602,7 @@ void *statistics_thread(void *arg) {
     }
     printf("\n\n");
 
-    log_message(&logQueue, "[statistics_thread]: Escrevendo estatísticas e calculando valores mínimos, máximos e médias de umidade por cidade.\n");
+    log_message(&logQueue, "[statistics_thread]: Escrevendo estatísticas dos valores mínimos, máximos e médias de umidade por cidade.\n");
     printf("------------------------------------------------------------\n");
     printf("UMIDADE (%%)\n");
     printf("------------------------------------------------------------\n"); 
@@ -622,7 +624,7 @@ void *statistics_thread(void *arg) {
     }
     printf("\n\n");
 
-    log_message(&logQueue, "[statistics_thread]: Escrevendo estatísticas e calculando valores mínimos, máximos e médias de pressão atmosférica por cidade.\n");
+    log_message(&logQueue, "[statistics_thread]: Escrevendo estatísticas dos valores mínimos, máximos e médias de pressão atmosférica por cidade.\n");
     printf("------------------------------------------------------------\n");
     printf("PRESSÃO ATMOSFÉRICA (hPa)\n");
     printf("------------------------------------------------------------\n"); 
@@ -645,7 +647,7 @@ void *statistics_thread(void *arg) {
     }
     printf("\n\n");
 
-    log_message(&logQueue, "[statistics_thread]: Escrevendo estatísticas e calculando valor inicial, final e consumo de bateria por cidade.\n");
+    log_message(&logQueue, "[statistics_thread]: Escrevendo estatísticas do valor inicial, final e consumo de bateria por cidade.\n");
     printf("------------------------------------------------------------\n");
     printf("BATERIA\n");
     printf("------------------------------------------------------------\n");
@@ -705,7 +707,8 @@ void *statistics_thread(void *arg) {
     }
     printf("\n\n");
 
-    log_message(&logQueue, "[statistics_thread]: Statistics computed successfully.\n");
+    log_message(&logQueue, "[statistics_thread]: Finalizando escrita dos resultados finais.\n");    
+    log_message(&logQueue, "[statistics_thread]: Estatísticas computadas com sucesso.\n");
 
     clock_gettime(CLOCK_MONOTONIC, &endTime);
     double thread_elapsed = (endTime.tv_sec - startTime.tv_sec) + (endTime.tv_nsec - startTime.tv_nsec)/1e9;
