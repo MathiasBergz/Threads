@@ -146,12 +146,12 @@ void *file_reader_thread(void *arg) {
     Arquivos *file = (Arquivos *) arg;
     char log[256];
 
-    snprintf(log, 256, "[file_reader_thread]: Thread iniciada: Abrindo arquivo %s para leitura", file->filename);
+    snprintf(log, 256, "[file_reader_thread]: Thread iniciada: Abrindo arquivo %s para leitura\n", file->filename);
     log_message(&logQueue, log);
 
     FILE *fp = fopen(file->filename, "r");
     if (!fp) {
-        snprintf(log, 256, "[file_reader_thread]:Error opening file: %s", file->filename);
+        snprintf(log, 256, "[file_reader_thread]:Error opening file: %s\n", file->filename);
         log_message(&logQueue, log);
         pthread_exit(NULL);
     }
@@ -170,12 +170,12 @@ void *file_reader_thread(void *arg) {
     yyjson_val *root = yyjson_doc_get_root(doc);
 
     if (!root || !yyjson_is_arr(root)) {
-        snprintf(log, 256, "[file_reader_thread]:Invalid JSON in file: %s", file->filename);
+        snprintf(log, 256, "[file_reader_thread]:Invalid JSON in file: %s\n", file->filename);
         log_message(&logQueue, log);
         pthread_exit(NULL);
     }
 
-    snprintf(log, 256, "[file_reader_thread]: File loaded: %s, records: %zu", file->filename, yyjson_arr_size(root));
+    snprintf(log, 256, "[file_reader_thread]: File loaded: %s, records: %zu\n", file->filename, yyjson_arr_size(root));
     log_message(&logQueue, log);
 
     typedef struct {
@@ -211,7 +211,7 @@ void *file_reader_thread(void *arg) {
     int cont_duplicatas = 0;
     bool flag_data = false;
 
-    snprintf(log, 256, "[file_reader_thread]: Iniciando aquisição de dados e eliminação de duplicatas no arquivo %s", file->filename);
+    snprintf(log, 256, "[file_reader_thread]: Iniciando aquisição de dados e eliminação de duplicatas no arquivo %s\n", file->filename);
     log_message(&logQueue, log);
 
     
@@ -336,7 +336,7 @@ void *file_reader_thread(void *arg) {
         double distancia_absoluta = fabs(diferenca_segundos);
 
         if ((distancia_absoluta < 780.0) && (flag_temp_rep && flag_hum_rep && flag_press_rep && flag_bat_rep)) {
-            snprintf(log, 256, "[file_reader_thread]: [DUPLICATA] %s | ID: %lld | Tempo do último: %.0fs | Arquivo: %s", 
+            snprintf(log, 256, "[file_reader_thread]: [DUPLICATA] %s | ID: %lld | Tempo do último: %.0fs | Arquivo: %s\n", 
                     devices[dev_index].city, block_id, distancia_absoluta, file->filename);
             log_message(&logQueue, log);
         
@@ -346,7 +346,7 @@ void *file_reader_thread(void *arg) {
         }
 
         if (!flag_temp_found && !flag_hum_found && !flag_press_found && !flag_bat_found && !flag_sf_found) {
-            snprintf(log, 256, "[file_reader_thread]: Bloco 100%% vazio ignorado no arq: %s", file->filename);
+            snprintf(log, 256, "[file_reader_thread]: Bloco 100%% vazio ignorado no arq: %s\n", file->filename);
             log_message(&logQueue, log);
             
             continue;
@@ -361,7 +361,7 @@ void *file_reader_thread(void *arg) {
             if (!flag_bat_found)   strcat(missing_vars, "batterylevel |");
             if (!flag_sf_found)    strcat(missing_vars, "lora_spreading_factor");
 
-            snprintf(log, 256, "[file_reader_thread]: Bloco ID: %lld incompleto! Faltou: [%s] no arquivo %s", 
+            snprintf(log, 256, "[file_reader_thread]: Bloco ID: %lld incompleto! Faltou: [%s] no arquivo %s\n", 
                      block_id, missing_vars, file->filename);
             log_message(&logQueue, log);
         }
@@ -391,7 +391,7 @@ void *file_reader_thread(void *arg) {
     file->qtd_reg_validos = cont_adicionados;
     file->qtd_duplicatas = cont_duplicatas;
 
-    snprintf(log, 256, "[file_reader_thread]: REGISTROS DE \"%s\": %d lidos, %d adicionados (Caxias=%d, Bento=%d), %d duplicatas", 
+    snprintf(log, 256, "[file_reader_thread]: REGISTROS DE \"%s\": %d lidos, %d adicionados (Caxias=%d, Bento=%d), %d duplicatas\n", 
              file->filename, file->qtd_registros, cont_adicionados, cont_caxias, cont_bento, cont_duplicatas);
     log_message(&logQueue, log);
 
@@ -400,7 +400,7 @@ void *file_reader_thread(void *arg) {
     clock_gettime(CLOCK_MONOTONIC, &endTime);
     double thread_elapsed = (endTime.tv_sec - startTime.tv_sec) + (endTime.tv_nsec - startTime.tv_nsec)/1e9;
 
-    snprintf(log, 256, "[file_reader_thread]: \"%s\" processado em %.3f segundos.", file->filename, thread_elapsed);
+    snprintf(log, 256, "[file_reader_thread]: \"%s\" processado em %.3f segundos.\n", file->filename, thread_elapsed);
     log_message(&logQueue, log);
     pthread_exit(NULL);
 }
@@ -438,7 +438,7 @@ void *statistics_thread(void *arg) {
     RecordList *records = data->records;
     Arquivos *files = data->arqs;
     char log[256];
-    snprintf(log, 256, "[statistics_thread]: Iniciando cálculo estatístico para %d registros válidos.", records->count);
+    snprintf(log, 256, "[statistics_thread]: Iniciando cálculo estatístico para %d registros válidos.\n", records->count);
     log_message(&logQueue, log);
 
     typedef struct {
@@ -479,7 +479,7 @@ void *statistics_thread(void *arg) {
         if (strcmp(r.city, "Caxias do Sul") == 0) city = &cities[0];
         else if (strcmp(r.city, "Bento Gonçalves") == 0) city = &cities[1];
         if (!city) {
-            log_message(&logQueue, "[statistics_thread]: Há registros sem cidade.");
+            log_message(&logQueue, "[statistics_thread]: Há registros sem cidade.\n");
             continue;
         }
 
@@ -528,7 +528,7 @@ void *statistics_thread(void *arg) {
     }
     pthread_mutex_unlock(&records->mutex);
 
-    log_message(&logQueue, "[statistics_thread]: Iniciando cálculo de médias e escrita dos resultados finais.");    
+    log_message(&logQueue, "[statistics_thread]: Iniciando cálculo de médias e escrita dos resultados finais.\n");    
 
     // Print results
     printf("============================================================\n");
@@ -536,7 +536,7 @@ void *statistics_thread(void *arg) {
     printf("Processamento utilizando pthreads\n");
     printf("============================================================\n\n");
 
-    log_message(&logQueue, "[statistics_thread]: Escrevendo estatísticas de registros totais, válido, duplicados e período analisado por arquivo analisado.");
+    log_message(&logQueue, "[statistics_thread]: Escrevendo estatísticas de registros totais, válido, duplicados e período analisado por arquivo analisado.\n");
     char StartPeriod_Formatado[64], EndPeriod_Formatado[64];
     for (int i = 0; i < QTD_ARQUIVOS; i++){
         formatar_data_curta(files[i].periodo_inicio, StartPeriod_Formatado);
@@ -549,20 +549,20 @@ void *statistics_thread(void *arg) {
         printf("Período analisado: %s a %s\n",StartPeriod_Formatado,EndPeriod_Formatado);
         printf("\n");
 
-        snprintf(log, 512, "[statistics_thread]: Arquivo: %s | Registros totais: %d | Registros válidos: %d | Registros duplicados: %d (%.2f%%) | Período analisado: %s a %s", files[i].filename, files[i].qtd_registros, files[i].qtd_reg_validos, files[i].qtd_duplicatas, (files[i].qtd_registros > 0 ? (float)files[i].qtd_duplicatas / files[i].qtd_registros * 100 : 0), StartPeriod_Formatado, EndPeriod_Formatado);
+        snprintf(log, 512, "[statistics_thread]: Arquivo: %s | Registros totais: %d | Registros válidos: %d | Registros duplicados: %d (%.2f%%) | Período analisado: %s a %s\n", files[i].filename, files[i].qtd_registros, files[i].qtd_reg_validos, files[i].qtd_duplicatas, (files[i].qtd_registros > 0 ? (float)files[i].qtd_duplicatas / files[i].qtd_registros * 100 : 0), StartPeriod_Formatado, EndPeriod_Formatado);
         log_message(&logQueue, log);
     }
 
-    log_message(&logQueue, "\n[statistics_thread]: Escrevendo estatísticas de registros totais, válidos e duplicados globais.");
+    log_message(&logQueue, "[statistics_thread]: Escrevendo estatísticas de registros totais, válidos e duplicados globais.\n");
     printf("------------------------------------------------------------\n");
     printf("Total de registros lidos: %d\n", files[0].qtd_registros + files[1].qtd_registros);
     printf("Total de registros válidos: %d\n", globalRecords.count);
     printf("Total de registros duplicados: %d (%.2f%%)\n", files[0].qtd_duplicatas + files[1].qtd_duplicatas, (files[0].qtd_registros + files[1].qtd_registros) > 0 ? (float)(files[0].qtd_duplicatas + files[1].qtd_duplicatas) / (files[0].qtd_registros + files[1].qtd_registros) * 100 : 0);
 
-    snprintf(log, 256, "[statistics_thread]: Registros totais: %d | Registros válidos: %d | Registros duplicados: %d (%.2f%%)", files[0].qtd_registros + files[1].qtd_registros, files[0].qtd_reg_validos + files[1].qtd_reg_validos, files[0].qtd_duplicatas + files[1].qtd_duplicatas, (files[0].qtd_registros + files[1].qtd_registros) > 0 ? (float)(files[0].qtd_duplicatas + files[1].qtd_duplicatas) / (files[0].qtd_registros + files[1].qtd_registros) * 100 : 0);
+    snprintf(log, 256, "[statistics_thread]: Registros totais: %d | Registros válidos: %d | Registros duplicados: %d (%.2f%%)\n", files[0].qtd_registros + files[1].qtd_registros, files[0].qtd_reg_validos + files[1].qtd_reg_validos, files[0].qtd_duplicatas + files[1].qtd_duplicatas, (files[0].qtd_registros + files[1].qtd_registros) > 0 ? (float)(files[0].qtd_duplicatas + files[1].qtd_duplicatas) / (files[0].qtd_registros + files[1].qtd_registros) * 100 : 0);
     log_message(&logQueue, log);
 
-    log_message(&logQueue, "\n[statistics_thread]: Escrevendo estatísticas de registros válidos e período analisado por cidade.");
+    log_message(&logQueue, "[statistics_thread]: Escrevendo estatísticas de registros válidos e período analisado por cidade.\n");
     printf("\n------------------------------------------------------------\n");
     for (int i = 0; i < NUM_DEVICES; i++) {
         char periodStartFormatada[64], periodEndFormatada[64];
@@ -574,10 +574,10 @@ void *statistics_thread(void *arg) {
         printf("Período dos dados: %s a %s\n", periodStartFormatada, periodEndFormatada);
         printf("\n");
 
-        snprintf(log, 512, "[statistics_thread]: Cidade: %s | Registros válidos: %d | Período: %s a %s", cities[i].city, cities[i].totalRegCount, periodStartFormatada, periodEndFormatada);
+        snprintf(log, 512, "[statistics_thread]: Cidade: %s | Registros válidos: %d | Período: %s a %s\n", cities[i].city, cities[i].totalRegCount, periodStartFormatada, periodEndFormatada);
         log_message(&logQueue, log);
     }
-    log_message(&logQueue, "\n[statistics_thread]: Escrevendo estatísticas e calculando valores mínimos, máximos e médias dem temperatura por cidade.");
+    log_message(&logQueue, "[statistics_thread]: Escrevendo estatísticas e calculando valores mínimos, máximos e médias dem temperatura por cidade.\n");
     printf("------------------------------------------------------------\n");
     printf("TEMPERATURA (°C)\n");
     printf("------------------------------------------------------------\n"); 
@@ -595,12 +595,12 @@ void *statistics_thread(void *arg) {
                 cidade, cities[c].tempMin, dataFormatada_TempMin, cities[c].tempMax, dataFormatada_TempMax,
                 cities[c].tempCount ? cities[c].tempSum / cities[c].tempCount : 0);
         
-        snprintf(log, 512, "[statistics_thread]: Cidade: %s | Temperatura Mínima: %.2f | Data/Hora: %s | Temperatura Máxima: %.2f | Data/Hora: %s | Temperatura Média: %.2f", c==0 ? "Caxias do Sul" : "Bento Gonçalves", cities[c].tempMin, dataFormatada_TempMin, cities[c].tempMax, dataFormatada_TempMax, cities[c].tempCount ? cities[c].tempSum / cities[c].tempCount : 0);
+        snprintf(log, 512, "[statistics_thread]: Cidade: %s | Temperatura Mínima: %.2f | Data/Hora: %s | Temperatura Máxima: %.2f | Data/Hora: %s | Temperatura Média: %.2f\n", c==0 ? "Caxias do Sul" : "Bento Gonçalves", cities[c].tempMin, dataFormatada_TempMin, cities[c].tempMax, dataFormatada_TempMax, cities[c].tempCount ? cities[c].tempSum / cities[c].tempCount : 0);
         log_message(&logQueue, log);
     }
     printf("\n\n");
 
-    log_message(&logQueue, "\n[statistics_thread]: Escrevendo estatísticas e calculando valores mínimos, máximos e médias de umidade por cidade.");
+    log_message(&logQueue, "[statistics_thread]: Escrevendo estatísticas e calculando valores mínimos, máximos e médias de umidade por cidade.\n");
     printf("------------------------------------------------------------\n");
     printf("UMIDADE (%%)\n");
     printf("------------------------------------------------------------\n"); 
@@ -617,12 +617,12 @@ void *statistics_thread(void *arg) {
         printf("%s | %-6.2f | %-21s | %-6.2f | %-21s | %.2f\n",
                 cidade, cities[c].humMin, dataFormatada_HumMin, cities[c].humMax, dataFormatada_HumMax,
                 cities[c].humCount ? cities[c].humSum / cities[c].humCount : 0);
-        snprintf(log, 512, "[statistics_thread]: Cidade: %s | Umidade Mínima: %.2f | Data/Hora: %s | Umidade Máxima: %.2f | Data/Hora: %s | Umidade Média: %.2f", c==0 ? "Caxias do Sul" : "Bento Gonçalves", cities[c].humMin, dataFormatada_HumMin, cities[c].humMax, dataFormatada_HumMax, cities[c].humCount ? cities[c].humSum / cities[c].humCount : 0);
+        snprintf(log, 512, "[statistics_thread]: Cidade: %s | Umidade Mínima: %.2f | Data/Hora: %s | Umidade Máxima: %.2f | Data/Hora: %s | Umidade Média: %.2f\n", c==0 ? "Caxias do Sul" : "Bento Gonçalves", cities[c].humMin, dataFormatada_HumMin, cities[c].humMax, dataFormatada_HumMax, cities[c].humCount ? cities[c].humSum / cities[c].humCount : 0);
         log_message(&logQueue, log);
     }
     printf("\n\n");
 
-    log_message(&logQueue, "\n[statistics_thread]: Escrevendo estatísticas e calculando valores mínimos, máximos e médias de pressão atmosférica por cidade.");
+    log_message(&logQueue, "[statistics_thread]: Escrevendo estatísticas e calculando valores mínimos, máximos e médias de pressão atmosférica por cidade.\n");
     printf("------------------------------------------------------------\n");
     printf("PRESSÃO ATMOSFÉRICA (hPa)\n");
     printf("------------------------------------------------------------\n"); 
@@ -640,12 +640,12 @@ void *statistics_thread(void *arg) {
                 cidade, cities[c].presMin, dataFormatada_PresMin, cities[c].presMax, dataFormatada_PresMax,
                 cities[c].presCount ? cities[c].presSum / cities[c].presCount : 0);
         
-        snprintf(log, 512, "[statistics_thread]: Cidade: %s | Pressão Mínima: %.2f | Data/Hora: %s | Pressão Máxima: %.2f | Data/Hora: %s | Pressão Média: %.2f", c==0 ? "Caxias do Sul" : "Bento Gonçalves", cities[c].presMin, dataFormatada_PresMin, cities[c].presMax, dataFormatada_PresMax, cities[c].presCount ? cities[c].presSum / cities[c].presCount : 0);
+        snprintf(log, 512, "[statistics_thread]: Cidade: %s | Pressão Mínima: %.2f | Data/Hora: %s | Pressão Máxima: %.2f | Data/Hora: %s | Pressão Média: %.2f\n", c==0 ? "Caxias do Sul" : "Bento Gonçalves", cities[c].presMin, dataFormatada_PresMin, cities[c].presMax, dataFormatada_PresMax, cities[c].presCount ? cities[c].presSum / cities[c].presCount : 0);
         log_message(&logQueue, log);
     }
     printf("\n\n");
 
-    log_message(&logQueue, "\n[statistics_thread]: Escrevendo estatísticas e calculando valor inicial, final e consumo de bateria por cidade.");
+    log_message(&logQueue, "[statistics_thread]: Escrevendo estatísticas e calculando valor inicial, final e consumo de bateria por cidade.\n");
     printf("------------------------------------------------------------\n");
     printf("BATERIA\n");
     printf("------------------------------------------------------------\n");
@@ -659,12 +659,12 @@ void *statistics_thread(void *arg) {
                 cities[c].batteryStart, cities[c].batteryEnd,
                 cities[c].batteryStart - cities[c].batteryEnd);
         
-        snprintf(log, 256, "[statistics_thread]: Cidade: %s | Bateria Inicial: %.2f | Bateria Final: %.2f | Consumo: %.2f", c==0 ? "Caxias do Sul" : "Bento Gonçalves", cities[c].batteryStart, cities[c].batteryEnd, cities[c].batteryStart - cities[c].batteryEnd);
+        snprintf(log, 256, "[statistics_thread]: Cidade: %s | Bateria Inicial: %.2f | Bateria Final: %.2f | Consumo: %.2f\n", c==0 ? "Caxias do Sul" : "Bento Gonçalves", cities[c].batteryStart, cities[c].batteryEnd, cities[c].batteryStart - cities[c].batteryEnd);
         log_message(&logQueue, log);
     }
     printf("\n\n");
 
-    log_message(&logQueue, "\n[statistics_thread]: Escrevendo estatísticas de Spreading Factors utilizados por cidade.");
+    log_message(&logQueue, "[statistics_thread]: Escrevendo estatísticas de Spreading Factors utilizados por cidade.\n");
     printf("------------------------------------------------------------\n");
     printf("SPREADING FACTORS UTILIZADOS\n");
     printf("------------------------------------------------------------\n");
@@ -690,14 +690,14 @@ void *statistics_thread(void *arg) {
         if (cities[c].sfCount == 0) {
             printf("Nenhum registro de Spreading Factor encontrado\n");
 
-            snprintf(log, 256, "[statistics_thread]: Cidade: %s | Spreading Factors: Nenhum", c==0 ? "Caxias do Sul" : "Bento Gonçalves");
+            snprintf(log, 256, "[statistics_thread]: Cidade: %s | Spreading Factors: Nenhum\n", c==0 ? "Caxias do Sul" : "Bento Gonçalves");
             log_message(&logQueue, log);
         } else {
             for (int s = 0; s < cities[c].sfCount; s++) {
                 if (s > 0) printf(", ");
                 printf("SF%d", cities[c].sfUsed[s]);
 
-            snprintf(log, 256, "[statistics_thread]: Cidade: %s | Spreading Factors: SF%d", c==0 ? "Caxias do Sul" : "Bento Gonçalves", cities[c].sfUsed[s]);
+            snprintf(log, 256, "[statistics_thread]: Cidade: %s | Spreading Factor: SF%d\n", c==0 ? "Caxias do Sul" : "Bento Gonçalves", cities[c].sfUsed[s]);
             log_message(&logQueue, log);
             }
             printf("\n");
@@ -705,12 +705,12 @@ void *statistics_thread(void *arg) {
     }
     printf("\n\n");
 
-    log_message(&logQueue, "[statistics_thread]: Statistics computed successfully.");
+    log_message(&logQueue, "[statistics_thread]: Statistics computed successfully.\n");
 
     clock_gettime(CLOCK_MONOTONIC, &endTime);
     double thread_elapsed = (endTime.tv_sec - startTime.tv_sec) + (endTime.tv_nsec - startTime.tv_nsec)/1e9;
 
-    snprintf(log, 256, "[statistics_thread]: Escritas e cálculos de estatísticas concluídos em %.3f segundos.", thread_elapsed);
+    snprintf(log, 256, "[statistics_thread]: Escritas e cálculos de estatísticas concluídos em %.3f segundos.\n", thread_elapsed);
     log_message(&logQueue, log);
     pthread_exit(NULL);
 }
@@ -733,7 +733,7 @@ int main() {
     // Start logging thread
     pthread_create(&threads[0], NULL, logging_thread, &logQueue);
 
-    log_message(&logQueue, "[main]: Sistema inicializado. Estruturas e mutexes criados.");
+    log_message(&logQueue, "[main]: Sistema inicializado. Estruturas e mutexes criados.\n");
 
     // File reading threads
     Arquivos arquivos[2];
@@ -741,30 +741,30 @@ int main() {
     arquivos[0].filename = "files/mqtt_senzemo_cx_bg.json";
     arquivos[1].filename = "files/senzemo_cx_bg.json";
 
-    log_message(&logQueue, "[main]: Iniciando threads de leitura dos arquivos JSON...");
+    log_message(&logQueue, "[main]: Iniciando threads de leitura dos arquivos JSON...\n");
 
     pthread_create(&threads[1], NULL, file_reader_thread, (void *) &arquivos[0]);
     pthread_create(&threads[2], NULL, file_reader_thread, (void *) &arquivos[1]);
 
-    log_message(&logQueue, "[main]: Aguardando conclusão das threads de leitura...");
+    log_message(&logQueue, "[main]: Aguardando conclusão das threads de leitura...\n");
 
     // Wait for file threads
     pthread_join(threads[1], NULL);
     pthread_join(threads[2], NULL);
 
-    log_message(&logQueue, "[main]: Leitura de todos os arquivos concluida. Iniciando thread de analise de dados...");
+    log_message(&logQueue, "[main]: Leitura de todos os arquivos concluida. Iniciando thread de analise de dados...\n");
 
     // Start statistics thread
     StatsThreadData statsData = {&globalRecords, &logQueue, arquivos};
     pthread_create(&threads[3], NULL, statistics_thread, &statsData);
 
-    log_message(&logQueue, "[main]: Aguardando conclusão da thread de análise de dados...");
+    log_message(&logQueue, "[main]: Aguardando conclusão da thread de análise de dados...\n");
     pthread_join(threads[3], NULL);
 
     clock_gettime(CLOCK_MONOTONIC, &endTime);
     double elapsed = (endTime.tv_sec - startTime.tv_sec) + (endTime.tv_nsec - startTime.tv_nsec)/1e9;
 
-    log_message(&logQueue, "[main]: Escrevendo dados de desempenho e encerramento do programa na tela.");
+    log_message(&logQueue, "[main]: Escrevendo dados de desempenho e encerramento do programa na tela.\n");
     printf("------------------------------------------------------------\n");
     printf("DESEMPENHO\n");
     printf("------------------------------------------------------------\n");
@@ -782,10 +782,10 @@ int main() {
     printf("Processamento finalizado com sucesso.\n");
     printf("============================================================\n");
 
-    snprintf(log, 256, "[main]: Tempo total de execução: %.2f segundos. Threads utilizadas: 4. Arquivo de log gerado: processamento.log", elapsed);
+    snprintf(log, 256, "[main]: Tempo total de execução: %.2f segundos. Threads utilizadas: 4. Arquivo de log gerado: processamento.log\n", elapsed);
     log_message(&logQueue, log);
 
-    log_message(&logQueue, "[main]: Programa finalizado com sucesso. Desempenho registrado. Encerrando log...");
+    log_message(&logQueue, "[main]: Programa finalizado com sucesso. Desempenho registrado. Encerrando log...\n");
     log_message(&logQueue, "END");
     pthread_join(threads[0], NULL);
 
