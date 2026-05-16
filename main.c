@@ -9,7 +9,7 @@
 #include "yyjson.h"
 
 #define MAX_RECORDS 100000
-#define LOG_QUEUE_SIZE 1000
+#define LOG_QUEUE_SIZE 5000
 #define MAX_SF 6
 #define NUM_DEVICES 2
 #define QTD_ARQUIVOS 2
@@ -91,9 +91,20 @@ double calcular_diferenca_segundos(const char *data_antiga, const char *data_nov
 
 // ---------------- Logging ----------------
 void log_message(LogQueue *queue, const char *msg) {
+    time_t rawtime;
+    struct tm *timeinfo;
+    char time_str[32];
+    
+    time(&rawtime);
+    timeinfo = localtime(&rawtime);
+    strftime(time_str, sizeof(time_str), "%Y-%m-%d %H:%M:%S", timeinfo);
+
     pthread_mutex_lock(&queue->mutex);
-    snprintf(queue->messages[queue->tail], 256, "%s", msg);
+    
+    snprintf(queue->messages[queue->tail], 256, "[%s] %s", time_str, msg);
+    
     queue->tail = (queue->tail + 1) % LOG_QUEUE_SIZE;
+    
     pthread_cond_signal(&queue->cond);
     pthread_mutex_unlock(&queue->mutex);
 }
