@@ -1,6 +1,4 @@
 devices.c
-processamento.log
 .gitignore
+processamento.log
 main
-main.exe
-relatorio.txt
